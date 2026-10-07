@@ -1,28 +1,19 @@
 import express from 'express';
+import authMiddleware from '../middleware/authMiddleware.js';
 import Quiz from '../models/Quiz.js';
 import QuizAttempt from '../models/QuizAttempt.js';
-import authMiddleware from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// ======================================
-// CREATE QUIZ
-// ======================================
+// Create a quiz
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { title, classLevel, subject, chapter, questions } = req.body;
 
-    if (
-      !title ||
-      !classLevel ||
-      !subject ||
-      !questions ||
-      !Array.isArray(questions) ||
-      questions.length === 0
-    ) {
+    if (!title || !classLevel || !subject || !questions?.length) {
       return res.status(400).json({
         success: false,
-        message: 'Title, class, subject and questions are required',
+        message: 'title, classLevel, subject and questions are required',
       });
     }
 
@@ -30,18 +21,18 @@ router.post('/', authMiddleware, async (req, res) => {
       title,
       classLevel,
       subject,
-      chapter,
+      chapter: chapter || null,
       questions,
-      createdBy: req.user.userId,
+      createdBy: req.user.id,
     });
 
     res.status(201).json({
       success: true,
       message: 'Quiz created successfully',
-      quiz,
+      data: quiz,
     });
   } catch (error) {
-    console.error('Create quiz error:', error);
+    console.error('Create quiz error:', error.message);
 
     res.status(500).json({
       success: false,
@@ -50,54 +41,46 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
-// ======================================
-// GET ALL QUIZZES
-// ======================================
+// Get all quizzes
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { classLevel, subject, chapter } = req.query;
-
     const filter = {};
 
-    if (classLevel) {
-      filter.classLevel = Number(classLevel);
+    if (req.query.classLevel) {
+      filter.classLevel = Number(req.query.classLevel);
     }
 
-    if (subject) {
-      filter.subject = subject;
+    if (req.query.subject) {
+      filter.subject = req.query.subject;
     }
 
-    if (chapter) {
-      filter.chapter = chapter;
+    if (req.query.chapter) {
+      filter.chapter = req.query.chapter;
     }
 
     const quizzes = await Quiz.find(filter)
       .select('-questions.correctAnswer')
-      .sort({
-        createdAt: -1,
-      });
+      .sort({ createdAt: -1 });
 
-    res.status(200).json({
+    res.json({
       success: true,
       count: quizzes.length,
-      quizzes,
+      data: quizzes,
     });
   } catch (error) {
-    console.error('Get quizzes error:', error);
+    console.error('Get quizzes error:', error.message);
 
     res.status(500).json({
       success: false,
-      message: 'Failed to get quizzes',
+      message: 'Failed to fetch quizzes',
     });
   }
 });
 
-// ======================================
-// GET QUIZ BY ID
-// ======================================
-router.get('/:quizId', authMiddleware, async (req, res) => {
+// Get one quiz
+router.get('/:id', authMiddleware, async (req, res) => {
   try {
-    const quiz = await Quiz.findById(req.params.quizId);
+    const quiz = await Quiz.findById(req.params.id);
 
     if (!quiz) {
       return res.status(404).json({
@@ -106,51 +89,33 @@ router.get('/:quizId', authMiddleware, async (req, res) => {
       });
     }
 
-    // Do not send correct answers before submission
-    const safeQuestions = quiz.questions.map((question) => ({
-      _id: question._id,
-      question: question.question,
-      options: question.options,
-      explanation: question.explanation,
-      difficulty: question.difficulty,
-    }));
-
-    res.status(200).json({
+    res.json({
       success: true,
-      quiz: {
-        id: quiz._id,
-        title: quiz.title,
-        classLevel: quiz.classLevel,
-        subject: quiz.subject,
-        chapter: quiz.chapter,
-        questions: safeQuestions,
-      },
+      data: quiz,
     });
   } catch (error) {
-    console.error('Get quiz error:', error);
+    console.error('Get quiz error:', error.message);
 
     res.status(500).json({
       success: false,
-      message: 'Failed to get quiz',
+      message: 'Failed to fetch quiz',
     });
   }
 });
 
-// ======================================
-// SUBMIT QUIZ ATTEMPT
-// ======================================
-router.post('/:quizId/attempt', authMiddleware, async (req, res) => {
+// Submit quiz attempt
+router.post('/:id/submit', authMiddleware, async (req, res) => {
   try {
     const { answers } = req.body;
 
     if (!Array.isArray(answers)) {
       return res.status(400).json({
         success: false,
-        message: 'Answers array is required',
+        message: 'Answers must be an array',
       });
     }
 
-    const quiz = await Quiz.findById(req.params.quizId);
+    const quiz = await Quiz.findById(req.params.id);
 
     if (!quiz) {
       return res.status(404).json({
@@ -161,33 +126,29 @@ router.post('/:quizId/attempt', authMiddleware, async (req, res) => {
 
     let correctAnswers = 0;
 
-    const evaluatedAnswers = answers.map((answer) => {
-      const question = quiz.questions.id(answer.questionId);
+    const evaluatedAnswers = quiz.questions.map((question) => {
+      const submitted = answers.find(
+        (answer) => String(answer.questionId) === String(question._id),
+      );
 
-      if (!question) {
-        return {
-          questionId: answer.questionId,
-          selectedAnswer: answer.selectedAnswer,
-          correct: false,
-        };
-      }
+      const selectedAnswer = submitted ? submitted.selectedAnswer : null;
 
-      const isCorrect = question.correctAnswer === answer.selectedAnswer;
+      const correct =
+        selectedAnswer !== null &&
+        String(selectedAnswer) === String(question.correctAnswer);
 
-      if (isCorrect) {
+      if (correct) {
         correctAnswers++;
       }
 
       return {
-        questionId: answer.questionId,
-        selectedAnswer: answer.selectedAnswer,
-        correct: isCorrect,
+        questionId: question._id,
+        selectedAnswer,
+        correct,
       };
     });
 
     const totalQuestions = quiz.questions.length;
-
-    const score = correctAnswers;
 
     const percentage =
       totalQuestions > 0
@@ -195,10 +156,10 @@ router.post('/:quizId/attempt', authMiddleware, async (req, res) => {
         : 0;
 
     const attempt = await QuizAttempt.create({
-      user: req.user.userId,
+      user: req.user.id,
       quiz: quiz._id,
       answers: evaluatedAnswers,
-      score,
+      score: correctAnswers,
       totalQuestions,
       correctAnswers,
       percentage,
@@ -208,17 +169,17 @@ router.post('/:quizId/attempt', authMiddleware, async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Quiz submitted successfully',
-
-      result: {
+      data: {
         attemptId: attempt._id,
-        score,
+        score: correctAnswers,
         totalQuestions,
         correctAnswers,
         percentage,
+        answers: evaluatedAnswers,
       },
     });
   } catch (error) {
-    console.error('Submit quiz error:', error);
+    console.error('Submit quiz error:', error.message);
 
     res.status(500).json({
       success: false,
@@ -227,30 +188,26 @@ router.post('/:quizId/attempt', authMiddleware, async (req, res) => {
   }
 });
 
-// ======================================
-// GET USER QUIZ ATTEMPTS
-// ======================================
+// Get user's quiz attempts
 router.get('/attempts/my', authMiddleware, async (req, res) => {
   try {
     const attempts = await QuizAttempt.find({
-      user: req.user.userId,
+      user: req.user.id,
     })
       .populate('quiz', 'title classLevel subject chapter')
-      .sort({
-        createdAt: -1,
-      });
+      .sort({ completedAt: -1 });
 
-    res.status(200).json({
+    res.json({
       success: true,
       count: attempts.length,
-      attempts,
+      data: attempts,
     });
   } catch (error) {
-    console.error('Get quiz attempts error:', error);
+    console.error('Get attempts error:', error.message);
 
     res.status(500).json({
       success: false,
-      message: 'Failed to get quiz attempts',
+      message: 'Failed to fetch quiz attempts',
     });
   }
 });

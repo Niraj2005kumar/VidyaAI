@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import quizRoutes from './routes/quizRoutes.js';
 
 import connectDB from './config/db.js';
 
@@ -12,6 +13,8 @@ import studyRoutes from './routes/studyRoutes.js';
 import quizRoutes from './routes/quizRoutes.js';
 import progressRoutes from './routes/progressRoutes.js';
 import opportunityRoutes from './routes/opportunityRoutes.js';
+import progressRoutes from './routes/progressRoutes.js';
+import studyRoutes from './routes/studyRoutes.js';
 
 dotenv.config();
 
@@ -50,6 +53,9 @@ app.use('/api/users', userRoutes);
 app.use('/api/study', studyRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/progress', progressRoutes);
+app.use('/api/study', studyRoutes);
+app.use('/api/progress', progressRoutes);
+app.use('/api/quizzes', quizRoutes);
 app.use('/api/opportunities', opportunityRoutes);
 
 // 404 Handler

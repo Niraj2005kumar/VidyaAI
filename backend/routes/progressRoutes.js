@@ -1,13 +1,11 @@
 import express from 'express';
-import Progress from '../models/Progress.js';
 import authMiddleware from '../middleware/authMiddleware.js';
+import Progress from '../models/Progress.js';
 
 const router = express.Router();
 
-// ======================================
-// CREATE / UPDATE TOPIC PROGRESS
-// ======================================
-router.post('/', authMiddleware, async (req, res) => {
+// Create or update topic progress
+router.post('/update', authMiddleware, async (req, res) => {
   try {
     const {
       classLevel,
@@ -25,43 +23,58 @@ router.post('/', authMiddleware, async (req, res) => {
     if (!classLevel || !subject || !topic) {
       return res.status(400).json({
         success: false,
-        message: 'Class, subject and topic are required',
+        message: 'classLevel, subject and topic are required',
       });
     }
 
-    const progress = await Progress.findOneAndUpdate(
-      {
-        user: req.user.userId,
+    let progress = await Progress.findOne({
+      user: req.user.id,
+      classLevel,
+      subject,
+      chapter: chapter || null,
+      topic,
+    });
+
+    if (progress) {
+      progress.questionsAsked = questionsAsked ?? progress.questionsAsked;
+
+      progress.quizzesAttempted = quizzesAttempted ?? progress.quizzesAttempted;
+
+      progress.averageScore = averageScore ?? progress.averageScore;
+
+      progress.studyTimeMinutes = studyTimeMinutes ?? progress.studyTimeMinutes;
+
+      progress.masteryLevel = masteryLevel ?? progress.masteryLevel;
+
+      progress.isWeakArea = isWeakArea ?? progress.isWeakArea;
+
+      progress.lastStudiedAt = new Date();
+
+      await progress.save();
+    } else {
+      progress = await Progress.create({
+        user: req.user.id,
         classLevel,
         subject,
+        chapter: chapter || null,
         topic,
-      },
-      {
-        $set: {
-          chapter,
-          questionsAsked,
-          quizzesAttempted,
-          averageScore,
-          studyTimeMinutes,
-          masteryLevel,
-          isWeakArea,
-          lastStudiedAt: new Date(),
-        },
-      },
-      {
-        new: true,
-        upsert: true,
-        runValidators: true,
-      },
-    );
+        questionsAsked: questionsAsked || 0,
+        quizzesAttempted: quizzesAttempted || 0,
+        averageScore: averageScore || 0,
+        studyTimeMinutes: studyTimeMinutes || 0,
+        masteryLevel: masteryLevel || 'beginner',
+        isWeakArea: isWeakArea || false,
+        lastStudiedAt: new Date(),
+      });
+    }
 
     res.status(200).json({
       success: true,
       message: 'Progress updated successfully',
-      progress,
+      data: progress,
     });
   } catch (error) {
-    console.error('Update progress error:', error);
+    console.error('Progress update error:', error.message);
 
     res.status(500).json({
       success: false,
@@ -70,94 +83,80 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
-// ======================================
-// GET ALL USER PROGRESS
-// ======================================
+// Get all progress
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const progress = await Progress.find({
-      user: req.user.userId,
-    }).sort({
-      lastStudiedAt: -1,
-    });
+      user: req.user.id,
+    }).sort({ lastStudiedAt: -1 });
 
-    res.status(200).json({
+    res.json({
       success: true,
       count: progress.length,
-      progress,
+      data: progress,
     });
   } catch (error) {
-    console.error('Get progress error:', error);
+    console.error('Get progress error:', error.message);
 
     res.status(500).json({
       success: false,
-      message: 'Failed to get progress',
+      message: 'Failed to fetch progress',
     });
   }
 });
 
-// ======================================
-// GET WEAK AREAS
-// ======================================
+// Get weak areas
 router.get('/weak-areas', authMiddleware, async (req, res) => {
   try {
     const weakAreas = await Progress.find({
-      user: req.user.userId,
+      user: req.user.id,
       isWeakArea: true,
-    }).sort({
-      averageScore: 1,
-    });
+    }).sort({ lastStudiedAt: -1 });
 
-    res.status(200).json({
+    res.json({
       success: true,
       count: weakAreas.length,
-      weakAreas,
+      data: weakAreas,
     });
   } catch (error) {
-    console.error('Get weak areas error:', error);
+    console.error('Weak areas error:', error.message);
 
     res.status(500).json({
       success: false,
-      message: 'Failed to get weak areas',
+      message: 'Failed to fetch weak areas',
     });
   }
 });
 
-// ======================================
-// GET SUBJECT PROGRESS
-// ======================================
+// Get progress by subject
 router.get('/subject/:subject', authMiddleware, async (req, res) => {
   try {
     const progress = await Progress.find({
-      user: req.user.userId,
+      user: req.user.id,
       subject: req.params.subject,
-    }).sort({
-      lastStudiedAt: -1,
-    });
+    }).sort({ lastStudiedAt: -1 });
 
-    res.status(200).json({
+    res.json({
       success: true,
       subject: req.params.subject,
       count: progress.length,
-      progress,
+      data: progress,
     });
   } catch (error) {
-    console.error('Get subject progress error:', error);
+    console.error('Subject progress error:', error.message);
 
     res.status(500).json({
       success: false,
-      message: 'Failed to get subject progress',
+      message: 'Failed to fetch subject progress',
     });
   }
 });
 
-// ======================================
-// GET PROGRESS SUMMARY
-// ======================================
+// Overall progress summary
 router.get('/summary', authMiddleware, async (req, res) => {
   try {
     const progress = await Progress.find({
-      user: req.user.userId,
+      user: req.user.id,
     });
 
     const totalTopics = progress.length;
@@ -166,53 +165,49 @@ router.get('/summary', authMiddleware, async (req, res) => {
       (item) => item.masteryLevel === 'mastered',
     ).length;
 
-    const weakTopics = progress.filter(
-      (item) => item.isWeakArea === true,
-    ).length;
+    const weakTopics = progress.filter((item) => item.isWeakArea).length;
 
     const totalQuestions = progress.reduce(
-      (total, item) => total + item.questionsAsked,
+      (total, item) => total + (item.questionsAsked || 0),
       0,
     );
 
-    const totalQuizAttempts = progress.reduce(
-      (total, item) => total + item.quizzesAttempted,
+    const totalQuizzes = progress.reduce(
+      (total, item) => total + (item.quizzesAttempted || 0),
       0,
     );
 
-    const totalStudyMinutes = progress.reduce(
-      (total, item) => total + item.studyTimeMinutes,
+    const totalStudyTime = progress.reduce(
+      (total, item) => total + (item.studyTimeMinutes || 0),
       0,
     );
 
     const averageScore =
       totalTopics > 0
-        ? Number(
-            (
-              progress.reduce((total, item) => total + item.averageScore, 0) /
-              totalTopics
-            ).toFixed(2),
-          )
+        ? progress.reduce(
+            (total, item) => total + (item.averageScore || 0),
+            0,
+          ) / totalTopics
         : 0;
 
-    res.status(200).json({
+    res.json({
       success: true,
-      summary: {
+      data: {
         totalTopics,
         masteredTopics,
         weakTopics,
         totalQuestions,
-        totalQuizAttempts,
-        totalStudyMinutes,
-        averageScore,
+        totalQuizzes,
+        totalStudyTimeMinutes: totalStudyTime,
+        averageScore: Number(averageScore.toFixed(2)),
       },
     });
   } catch (error) {
-    console.error('Progress summary error:', error);
+    console.error('Progress summary error:', error.message);
 
     res.status(500).json({
       success: false,
-      message: 'Failed to get progress summary',
+      message: 'Failed to generate progress summary',
     });
   }
 });

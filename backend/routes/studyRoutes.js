@@ -1,12 +1,10 @@
 import express from 'express';
-import StudySession from '../models/StudySession.js';
 import authMiddleware from '../middleware/authMiddleware.js';
+import StudySession from '../models/StudySession.js';
 
 const router = express.Router();
 
-// ======================================
-// START STUDY SESSION
-// ======================================
+// Start a study session
 router.post('/start', authMiddleware, async (req, res) => {
   try {
     const { subject, topic } = req.body;
@@ -19,19 +17,20 @@ router.post('/start', authMiddleware, async (req, res) => {
     }
 
     const session = await StudySession.create({
-      user: req.user.userId,
+      user: req.user.id,
       subject,
-      topic,
+      topic: topic || null,
       startTime: new Date(),
+      durationMinutes: 0,
     });
 
     res.status(201).json({
       success: true,
       message: 'Study session started',
-      session,
+      data: session,
     });
   } catch (error) {
-    console.error('Start study session error:', error);
+    console.error('Start study session error:', error.message);
 
     res.status(500).json({
       success: false,
@@ -40,14 +39,12 @@ router.post('/start', authMiddleware, async (req, res) => {
   }
 });
 
-// ======================================
-// END STUDY SESSION
-// ======================================
-router.put('/:sessionId/end', authMiddleware, async (req, res) => {
+// End a study session
+router.put('/end/:id', authMiddleware, async (req, res) => {
   try {
     const session = await StudySession.findOne({
-      _id: req.params.sessionId,
-      user: req.user.userId,
+      _id: req.params.id,
+      user: req.user.id,
     });
 
     if (!session) {
@@ -60,18 +57,15 @@ router.put('/:sessionId/end', authMiddleware, async (req, res) => {
     if (session.endTime) {
       return res.status(400).json({
         success: false,
-        message: 'Study session has already ended',
+        message: 'Study session already ended',
       });
     }
 
     const endTime = new Date();
 
-    const durationMilliseconds =
-      endTime.getTime() - session.startTime.getTime();
-
     const durationMinutes = Math.max(
       0,
-      Math.round(durationMilliseconds / (1000 * 60)),
+      Math.round((endTime.getTime() - session.startTime.getTime()) / 60000),
     );
 
     session.endTime = endTime;
@@ -79,13 +73,13 @@ router.put('/:sessionId/end', authMiddleware, async (req, res) => {
 
     await session.save();
 
-    res.status(200).json({
+    res.json({
       success: true,
       message: 'Study session ended',
-      session,
+      data: session,
     });
   } catch (error) {
-    console.error('End study session error:', error);
+    console.error('End study session error:', error.message);
 
     res.status(500).json({
       success: false,
@@ -94,65 +88,53 @@ router.put('/:sessionId/end', authMiddleware, async (req, res) => {
   }
 });
 
-// ======================================
-// GET USER STUDY HISTORY
-// ======================================
+// Get user's study history
 router.get('/history', authMiddleware, async (req, res) => {
   try {
     const sessions = await StudySession.find({
-      user: req.user.userId,
-    }).sort({
-      startTime: -1,
-    });
+      user: req.user.id,
+    }).sort({ startTime: -1 });
 
-    res.status(200).json({
+    res.json({
       success: true,
       count: sessions.length,
-      sessions,
+      data: sessions,
     });
   } catch (error) {
-    console.error('Study history error:', error);
+    console.error('Study history error:', error.message);
 
     res.status(500).json({
       success: false,
-      message: 'Failed to get study history',
+      message: 'Failed to fetch study history',
     });
   }
 });
 
-// ======================================
-// GET TOTAL STUDY TIME
-// ======================================
+// Get total study time
 router.get('/total-time', authMiddleware, async (req, res) => {
   try {
-    const result = await StudySession.aggregate([
-      {
-        $match: {
-          user: req.user.userId,
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          totalMinutes: {
-            $sum: '$durationMinutes',
-          },
-        },
-      },
-    ]);
+    const sessions = await StudySession.find({
+      user: req.user.id,
+    });
 
-    const totalMinutes = result.length > 0 ? result[0].totalMinutes : 0;
+    const totalMinutes = sessions.reduce(
+      (total, session) => total + (session.durationMinutes || 0),
+      0,
+    );
 
-    res.status(200).json({
+    res.json({
       success: true,
-      totalMinutes,
+      data: {
+        totalStudyTimeMinutes: totalMinutes,
+        totalStudyTimeHours: Number((totalMinutes / 60).toFixed(2)),
+      },
     });
   } catch (error) {
-    console.error('Total study time error:', error);
+    console.error('Total study time error:', error.message);
 
     res.status(500).json({
       success: false,
-      message: 'Failed to calculate total study time',
+      message: 'Failed to calculate study time',
     });
   }
 });
