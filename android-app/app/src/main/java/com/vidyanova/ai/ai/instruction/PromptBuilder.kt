@@ -9,7 +9,8 @@ object PromptBuilder {
         classLevel: Int,
         subject: String,
         chapter: String? = null,
-        topic: String? = null
+        topic: String? = null,
+        curriculumContext: String = ""
     ): String {
         val style = StyleDetector.detect(question)
 
@@ -58,24 +59,34 @@ object PromptBuilder {
                 appendLine("Topic: $topic")
             }
 
+            if (curriculumContext.isNotBlank()) {
+                appendLine()
+                appendLine(curriculumContext)
+            }
+
             appendLine()
             appendLine("Requested Teaching Style:")
             appendLine(styleInstruction)
+
             appendLine()
             appendLine("Language:")
             appendLine(languageInstruction)
+
             appendLine()
             appendLine("Student Question:")
             appendLine(question.trim())
+
             appendLine()
             appendLine("Instructions:")
             appendLine("- Stay within the selected curriculum.")
+            appendLine("- Use the provided curriculum context when relevant.")
             appendLine("- Do not invent facts.")
             appendLine("- Use age-appropriate explanations.")
             appendLine("- Follow the requested teaching style.")
             appendLine("- Use steps when the question requires a solution.")
             appendLine("- Give the final answer clearly after the explanation.")
             appendLine("- Do not answer unrelated or unsafe requests.")
+
             appendLine()
             appendLine("ViyaAI Answer:")
         }

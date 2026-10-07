@@ -1,14 +1,5 @@
 package com.vidyanova.ai.ai.instruction
 
-enum class TeachingMode {
-    SIMPLE,
-    DETAILED,
-    STEP_BY_STEP,
-    EXAMPLE_BASED,
-    EXAM_READY,
-    BASIC
-}
-
 data class StyleDetectionResult(
     val mode: TeachingMode,
     val language: String
@@ -19,16 +10,24 @@ object StyleDetector {
     fun detect(question: String): StyleDetectionResult {
         val text = question.trim().lowercase()
 
-        val language = detectLanguage(text)
-        val mode = detectStyle(text)
-
         return StyleDetectionResult(
-            mode = mode,
-            language = language
+            mode = detectStyle(text),
+            language = detectLanguage(text)
         )
     }
 
     private fun detectLanguage(text: String): String {
+        val hindiWords = listOf(
+            "क्या",
+            "कैसे",
+            "क्यों",
+            "समझाओ",
+            "बताओ",
+            "है",
+            "में",
+            "कितना"
+        )
+
         val hinglishWords = listOf(
             "bhai",
             "samjha",
@@ -41,17 +40,6 @@ object StyleDetector {
             "mein",
             "me",
             "basic se"
-        )
-
-        val hindiWords = listOf(
-            "क्या",
-            "कैसे",
-            "क्यों",
-            "समझाओ",
-            "बताओ",
-            "है",
-            "में",
-            "कितना"
         )
 
         return when {
