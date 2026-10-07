@@ -50,7 +50,7 @@ data class SubjectItem(
 @Composable
 fun SubjectScreen(
     onBack: () -> Unit,
-    onOpenTopic: () -> Unit
+    onOpenTopic: (String) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
@@ -118,7 +118,7 @@ fun SubjectScreen(
                     progress = subject.progress,
                     icon = subject.icon,
                     accentColor = subject.accentColor,
-                    onClick = onOpenTopic
+                    onClick = { onOpenTopic(subject.name) }
                 )
             }
         }

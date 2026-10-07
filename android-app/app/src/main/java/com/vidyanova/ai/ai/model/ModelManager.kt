@@ -7,70 +7,64 @@ class ModelManager(
     private val context: Context
 ) {
 
-    private val modelDirectory: File
-        get() = File(context.filesDir, "model")
-
-    private val modelFile: File
-        get() = File(
-            modelDirectory,
-            ModelConfig.MODEL_FILE_NAME
+    fun getModelFile(): File {
+        val modelDir = File(
+            context.filesDir,
+            "model"
         )
 
-    fun isModelAvailable(): Boolean {
-        return modelFile.exists() &&
-            modelFile.length() > 0
-    }
-
-    fun getModelPath(): String? {
-        return if (isModelAvailable()) {
-            modelFile.absolutePath
-        } else {
-            null
+        if (!modelDir.exists()) {
+            modelDir.mkdirs()
         }
+
+        return File(
+            modelDir,
+            ModelConfig.MODEL_FILE_NAME
+        )
     }
 
-    fun prepareModel(): Boolean {
-        return try {
-            if (isModelAvailable()) {
-                return true
+    fun isModelAvailable(): Boolean {
+        val modelFile = getModelFile()
+
+        return modelFile.exists() &&
+                modelFile.length() > 0
+    }
+
+    fun prepareModel(): File {
+        val modelFile = getModelFile()
+
+        if (isModelAvailable()) {
+            return modelFile
+        }
+
+        context.assets.open(
+            ModelConfig.MODEL_ASSET_PATH
+        ).use { input ->
+
+            modelFile.outputStream().use { output ->
+                input.copyTo(
+                    output,
+                    bufferSize = 1024 * 1024
+                )
             }
+        }
 
-            if (!modelDirectory.exists()) {
-                modelDirectory.mkdirs()
-            }
+        return modelFile
+    }
 
-            context.assets.open(
-                ModelConfig.MODEL_ASSET_PATH
-            ).use { inputStream ->
-
-                modelFile.outputStream().use { outputStream ->
-
-                    inputStream.copyTo(
-                        outputStream,
-                        bufferSize = 1024 * 1024
-                    )
-                }
-            }
-
-            isModelAvailable()
-
-        } catch (error: Exception) {
-            modelFile.delete()
-            false
+    fun getModelSize(): Long {
+        return if (isModelAvailable()) {
+            getModelFile().length()
+        } else {
+            0L
         }
     }
 
     fun deleteModel() {
+        val modelFile = getModelFile()
+
         if (modelFile.exists()) {
             modelFile.delete()
-        }
-    }
-
-    fun getModelSizeBytes(): Long {
-        return if (isModelAvailable()) {
-            modelFile.length()
-        } else {
-            0L
         }
     }
 }

@@ -53,7 +53,7 @@ data class ClassOption(
 
 @Composable
 fun ClassSelectionScreen(
-    onContinue: () -> Unit
+    onContinue: (Int) -> Unit
 ) {
     val classes = remember {
         listOf(
@@ -193,7 +193,7 @@ fun ClassSelectionScreen(
                 .padding(16.dp)
         ) {
             Button(
-                onClick = onContinue,
+                onClick = { onContinue(selectedClassId) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp),

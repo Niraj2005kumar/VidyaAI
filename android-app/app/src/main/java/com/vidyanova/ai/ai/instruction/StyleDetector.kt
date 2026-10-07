@@ -7,12 +7,16 @@ data class StyleDetectionResult(
 
 object StyleDetector {
 
-    fun detect(question: String): StyleDetectionResult {
+    fun detect(
+        question: String,
+        preferredMode: TeachingMode? = null,
+        preferredLanguage: String? = null
+    ): StyleDetectionResult {
         val text = question.trim().lowercase()
 
         return StyleDetectionResult(
-            mode = detectStyle(text),
-            language = detectLanguage(text)
+            mode = detectStyle(text) ?: preferredMode ?: TeachingMode.SIMPLE,
+            language = preferredLanguage?.lowercase() ?: detectLanguage(text)
         )
     }
 
@@ -49,7 +53,7 @@ object StyleDetector {
         }
     }
 
-    private fun detectStyle(text: String): TeachingMode {
+    private fun detectStyle(text: String): TeachingMode? {
         return when {
             text.contains("step by step") ||
             text.contains("step-by-step") ||
@@ -88,7 +92,7 @@ object StyleDetector {
                 TeachingMode.SIMPLE
 
             else ->
-                TeachingMode.SIMPLE
+                null
         }
     }
 }

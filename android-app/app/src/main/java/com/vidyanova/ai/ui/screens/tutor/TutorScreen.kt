@@ -40,13 +40,14 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,19 +57,31 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vidyanova.ai.ui.components.OfflineIndicatorBadge
+import com.vidyanova.ai.ai.instruction.TeachingMode
+import com.vidyanova.ai.data.repository.ProgressRepository
+import com.vidyanova.ai.data.repository.TutorRepository
 import com.vidyanova.ai.ui.theme.Primary
 import com.vidyanova.ai.ui.theme.Secondary
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun TutorScreen(
     initialPrompt: String? = null,
+    classLevel: Int = 10,
+    subject: String = "Mathematics",
+    chapter: String? = null,
+    topic: String? = null,
     onBack: () -> Unit,
     onOpenScan: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
+    val tutorRepository = remember(context) { TutorRepository(context) }
     var inputText by remember { mutableStateOf(initialPrompt ?: "") }
     var selectedLanguage by remember { mutableStateOf("Hinglish") }
     var selectedStyle by remember { mutableStateOf(ExplanationStyle.StepByStep) }
+    var isGenerating by remember { mutableStateOf(false) }
 
     val languages = listOf("English", "Hindi", "Hinglish")
 
@@ -94,8 +107,24 @@ fun TutorScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
+    DisposableEffect(tutorRepository) {
+        onDispose { tutorRepository.releaseModel() }
+    }
+
     fun sendMessage(userText: String) {
-        if (userText.isBlank()) return
+        if (isGenerating) return
+        if (userText.isBlank()) {
+            messages.add(
+                ChatMessage(
+                    text = "Please apna question likho.",
+                    isFromUser = false
+                )
+            )
+            coroutineScope.launch {
+                listState.animateScrollToItem(messages.size - 1)
+            }
+            return
+        }
 
         messages.add(
             ChatMessage(
@@ -105,21 +134,53 @@ fun TutorScreen(
             )
         )
 
-        val reply = generateOfflineMockResponse(userText, selectedStyle, selectedLanguage)
-
-        messages.add(
-            ChatMessage(
-                text = reply,
-                isFromUser = false,
-                timestamp = "Just now",
-                styleTag = selectedStyle.displayName
-            )
+        val pendingMessage = ChatMessage(
+            text = "ViyaAI is preparing an on-device answer…",
+            isFromUser = false,
+            styleTag = selectedStyle.displayName
         )
+        messages.add(pendingMessage)
 
         inputText = ""
+        isGenerating = true
 
         coroutineScope.launch {
-            listState.animateScrollToItem(messages.size - 1)
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    tutorRepository.askTutor(
+                        question = userText,
+                        classLevel = classLevel,
+                        subject = subject,
+                        chapter = chapter,
+                        topic = topic,
+                        preferredMode = selectedStyle.toTeachingMode(),
+                        preferredLanguage = selectedLanguage.lowercase()
+                    )
+                }
+
+                val pendingIndex = messages.indexOfFirst { it.id == pendingMessage.id }
+                if (pendingIndex >= 0) {
+                    messages[pendingIndex] = pendingMessage.copy(
+                        text = result.answer,
+                        styleTag = result.mode.replace('_', ' ')
+                    )
+                }
+
+                if (result.success) {
+                    coroutineScope.launch(Dispatchers.IO) {
+                        ProgressRepository.recordTutorQuestion(
+                            classLevel = classLevel,
+                            subject = subject,
+                            chapter = chapter ?: "General",
+                            topic = topic ?: "Tutor questions"
+                        )
+                    }
+                }
+
+                listState.animateScrollToItem(messages.size - 1)
+            } finally {
+                isGenerating = false
+            }
         }
     }
 
@@ -331,6 +392,7 @@ fun TutorScreen(
                         focusedBorderColor = Primary,
                         unfocusedBorderColor = Color.Transparent
                     ),
+                    enabled = !isGenerating,
                     maxLines = 3
                 )
 
@@ -356,6 +418,7 @@ fun TutorScreen(
                 // Send Button
                 IconButton(
                     onClick = { sendMessage(inputText) },
+                    enabled = !isGenerating,
                     modifier = Modifier
                         .size(42.dp)
                         .background(Primary, CircleShape)
@@ -371,6 +434,16 @@ fun TutorScreen(
         }
     }
 }
+
+private fun ExplanationStyle.toTeachingMode(): TeachingMode =
+    when (this) {
+        ExplanationStyle.Simple -> TeachingMode.SIMPLE
+        ExplanationStyle.Detailed -> TeachingMode.DETAILED
+        ExplanationStyle.StepByStep -> TeachingMode.STEP_BY_STEP
+        ExplanationStyle.Example -> TeachingMode.EXAMPLE_BASED
+        ExplanationStyle.ExamReady -> TeachingMode.EXAM_READY
+        ExplanationStyle.Basic -> TeachingMode.BASIC
+    }
 
 @Composable
 fun ChatBubble(message: ChatMessage) {
@@ -435,35 +508,6 @@ fun ChatBubble(message: ChatMessage) {
                     modifier = Modifier.align(Alignment.End)
                 )
             }
-        }
-    }
-}
-
-private fun generateOfflineMockResponse(
-    query: String,
-    style: ExplanationStyle,
-    language: String
-): String {
-    val q = query.lowercase()
-
-    return when {
-        q.contains("basic") || style == ExplanationStyle.Basic -> {
-            "Simple shabdon mein samjho: Kisi bhi concept ki shuruaat basic foundation se hoti hai.\nJaise Quadratic Equation ka standard form hota hai: ax² + bx + c = 0.\nYahan 'a' kabhi zero nahi ho sakta kyunki tab ye quadratic nahi bachega!"
-        }
-        q.contains("2 line") || style == ExplanationStyle.Simple -> {
-            "Newton's 3rd Law ke mutabiq: Har action ka ek barabar aur opposite reaction hota hai.\nJaise jab aap zameen par chalte hain, toh aap zameen ko peeche push karte hain aur zameen aapko aage!"
-        }
-        q.contains("step by step") || style == ExplanationStyle.StepByStep -> {
-            "Aaiye ise step-by-step solve karte hain:\nStep 1: Given equation ko standard form mein likhein.\nStep 2: Coefficients identify karein (a, b, c).\nStep 3: Discriminant D = b² - 4ac calculate karein.\nStep 4: D > 0 hai toh do real roots milenge: x = (-b ± √D) / 2a."
-        }
-        q.contains("example") || style == ExplanationStyle.Example -> {
-            "Ek practical example dekhte hain:\nMaano ek train 60 km/h ki speed se chal rahi hai aur 2 ghante travel karti hai.\nDistance = Speed × Time\nDistance = 60 × 2 = 120 km!\nIs tarah physics daily life se judti hai."
-        }
-        q.contains("exam") || style == ExplanationStyle.ExamReady -> {
-            "Board Exam Answer Key Format:\n• Definition (1 Mark): Photosynthesis is the biochemical process by which plants synthesize glucose from CO₂ and H₂O in presence of sunlight.\n• Equation (1 Mark): 6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂.\n• Key Organelle: Chloroplasts."
-        }
-        else -> {
-            "ViyaAI Offline Response:\nAapka concept bilkul clear ho jayega! ViyaAI offline database mein Class 10 ke core concepts cached hain. Aap detail se pooch sakte hain ya camera se question scan kar sakte hain."
         }
     }
 }

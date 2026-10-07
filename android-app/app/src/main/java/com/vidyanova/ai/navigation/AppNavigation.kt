@@ -1,6 +1,11 @@
 package com.vidyanova.ai.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -29,6 +34,11 @@ fun VidyaNovaNavHost(
     navController: NavHostController = rememberNavController(),
     startDestination: String = "splash"
 ) {
+    var selectedClassLevel by remember { mutableIntStateOf(10) }
+    var selectedSubject by remember { mutableStateOf("Mathematics") }
+    var selectedTopic by remember { mutableStateOf<String?>(null) }
+    var tutorInitialPrompt by remember { mutableStateOf<String?>(null) }
+
     NavHost(
         navController = navController,
         startDestination = startDestination
@@ -55,7 +65,8 @@ fun VidyaNovaNavHost(
 
         composable("classSelection") {
             ClassSelectionScreen(
-                onContinue = {
+                onContinue = { classLevel ->
+                    selectedClassLevel = classLevel
                     navController.navigate("home") {
                         popUpTo("classSelection") { inclusive = true }
                     }
@@ -74,19 +85,30 @@ fun VidyaNovaNavHost(
         composable("subjects") {
             SubjectScreen(
                 onBack = { navController.popBackStack() },
-                onOpenTopic = { navController.navigate("topics") }
+                onOpenTopic = { subject ->
+                    selectedSubject = subject
+                    navController.navigate("topics")
+                }
             )
         }
 
         composable("topics") {
             TopicSelectionScreen(
+                subject = selectedSubject,
                 onBack = { navController.popBackStack() },
-                onOpenTutor = { navController.navigate("tutor") }
+                onOpenTutor = { topic ->
+                    selectedTopic = topic
+                    navController.navigate("tutor")
+                }
             )
         }
 
         composable("tutor") {
             TutorScreen(
+                initialPrompt = tutorInitialPrompt,
+                classLevel = selectedClassLevel,
+                subject = selectedSubject,
+                topic = selectedTopic,
                 onBack = { navController.popBackStack() },
                 onOpenScan = { navController.navigate("scanLearn") }
             )
@@ -95,7 +117,8 @@ fun VidyaNovaNavHost(
         composable("scanLearn") {
             ScanLearnScreen(
                 onBack = { navController.popBackStack() },
-                onAskTutor = { _ ->
+                onAskTutor = { prompt ->
+                    tutorInitialPrompt = prompt
                     navController.navigate("tutor")
                 }
             )

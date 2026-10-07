@@ -33,8 +33,9 @@ data class ChapterTopic(
 
 @Composable
 fun TopicSelectionScreen(
+    subject: String = "Mathematics",
     onBack: () -> Unit,
-    onOpenTutor: () -> Unit
+    onOpenTutor: (String?) -> Unit
 ) {
     val topics = listOf(
         ChapterTopic("Quadratic Equations", 5, 100, true),
@@ -50,7 +51,7 @@ fun TopicSelectionScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         AppTopBar(
-            title = "Mathematics Topics",
+            title = "$subject Topics",
             subtitle = "Chapter 1 - 5",
             onBack = onBack,
             showOfflineBadge = true
@@ -67,14 +68,14 @@ fun TopicSelectionScreen(
                     topicCount = topic.subtopicCount,
                     progress = topic.progress,
                     completed = topic.isCompleted,
-                    onClick = onOpenTutor
+                    onClick = { onOpenTutor(topic.title) }
                 )
             }
 
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = onOpenTutor,
+                    onClick = { onOpenTutor(null) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(54.dp),

@@ -10,9 +10,10 @@ object PromptBuilder {
         subject: String,
         chapter: String? = null,
         topic: String? = null,
-        curriculumContext: String = ""
+        curriculumContext: String = "",
+        detectedStyle: StyleDetectionResult = StyleDetector.detect(question)
     ): String {
-        val style = StyleDetector.detect(question)
+        val style = detectedStyle
 
         val styleInstruction = when (style.mode) {
             TeachingMode.SIMPLE ->
