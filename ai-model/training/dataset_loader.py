@@ -13,19 +13,23 @@ def load_training_dataset():
 
 
 def format_example(example):
+    question = example["question"]
+    answer = example["answer"]
+
     return {
         "text": (
             "<|im_start|>system\n"
             "You are ViyaAI, an offline AI tutor for Class 1 to Class 10. "
             "Stay aligned with the student's curriculum. "
             "Explain according to the requested teaching style. "
+            "Use simple and age-appropriate language. "
             "Do not answer unrelated or unsafe questions."
             "<|im_end|>\n"
             "<|im_start|>user\n"
-            f"{example['question']}"
+            f"{question}"
             "<|im_end|>\n"
             "<|im_start|>assistant\n"
-            f"{example['answer']}"
+            f"{answer}"
             "<|im_end|>"
         )
     }

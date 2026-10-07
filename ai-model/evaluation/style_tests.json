@@ -1,0 +1,92 @@
+[
+  {
+    "id": "style_simple_001",
+    "class": 5,
+    "subject": "Mathematics",
+    "question": "What is a fraction?",
+    "requested_style": "simple",
+    "language": "english",
+    "expected_behavior": "Explain the concept in simple, easy-to-understand language."
+  },
+  {
+    "id": "style_detailed_001",
+    "class": 8,
+    "subject": "Science",
+    "question": "Explain photosynthesis.",
+    "requested_style": "detailed",
+    "language": "english",
+    "expected_behavior": "Provide a detailed curriculum-aligned explanation."
+  },
+  {
+    "id": "style_step_001",
+    "class": 7,
+    "subject": "Mathematics",
+    "question": "Solve 3x + 5 = 20.",
+    "requested_style": "step-by-step",
+    "language": "english",
+    "expected_behavior": "Show the solution as clear sequential steps."
+  },
+  {
+    "id": "style_example_001",
+    "class": 6,
+    "subject": "Science",
+    "question": "Explain evaporation.",
+    "requested_style": "example-based",
+    "language": "english",
+    "expected_behavior": "Explain the concept using a simple real-life example."
+  },
+  {
+    "id": "style_exam_001",
+    "class": 10,
+    "subject": "Science",
+    "question": "What is Newton's third law?",
+    "requested_style": "exam-ready",
+    "language": "english",
+    "expected_behavior": "Give a concise, exam-ready definition with an appropriate example."
+  },
+  {
+    "id": "style_basic_001",
+    "class": 4,
+    "subject": "Mathematics",
+    "question": "Explain multiplication.",
+    "requested_style": "basic",
+    "language": "english",
+    "expected_behavior": "Explain from the most basic concept using age-appropriate language."
+  },
+  {
+    "id": "style_hindi_001",
+    "class": 6,
+    "subject": "Science",
+    "question": "प्रकाश संश्लेषण क्या है?",
+    "requested_style": "simple",
+    "language": "hindi",
+    "expected_behavior": "Answer in simple Hindi using curriculum-aligned terminology."
+  },
+  {
+    "id": "style_hinglish_001",
+    "class": 8,
+    "subject": "Mathematics",
+    "question": "Bhai quadratic equation ko basic se samjha.",
+    "requested_style": "simple",
+    "language": "hinglish",
+    "expected_behavior": "Explain the concept in simple Hinglish without losing mathematical accuracy."
+  },
+  {
+    "id": "style_two_lines_001",
+    "class": 7,
+    "subject": "Science",
+    "question": "Water cycle ko 2 line mein batao.",
+    "requested_style": "simple",
+    "language": "hinglish",
+    "expected_behavior": "Give a concise two-line explanation in Hinglish."
+  },
+  {
+    "id": "style_combined_001",
+    "class": 9,
+    "subject": "Mathematics",
+    "question": "Bhai Pythagoras theorem example ke saath step by step samjha.",
+    "requested_style": "step-by-step",
+    "language": "hinglish",
+    "expected_behavior": "Explain step by step in Hinglish and include a simple example."
+  }
+]

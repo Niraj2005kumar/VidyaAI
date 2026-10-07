@@ -1,6 +1,5 @@
 from unsloth import FastLanguageModel
-from trl import SFTTrainer
-from transformers import TrainingArguments
+from trl import SFTTrainer, SFTConfig
 
 from config import (
     MODEL_NAME,
@@ -24,8 +23,7 @@ from dataset_loader import prepare_dataset
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name=MODEL_NAME,
     max_seq_length=MAX_SEQ_LENGTH,
-    load_in_4bit=True,
-    dtype=None
+    load_in_4bit=True
 )
 
 model = FastLanguageModel.get_peft_model(
@@ -47,7 +45,7 @@ trainer = SFTTrainer(
     dataset_text_field="text",
     max_seq_length=MAX_SEQ_LENGTH,
     packing=False,
-    args=TrainingArguments(
+    args=SFTConfig(
         output_dir=OUTPUT_DIR,
         per_device_train_batch_size=BATCH_SIZE,
         gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
