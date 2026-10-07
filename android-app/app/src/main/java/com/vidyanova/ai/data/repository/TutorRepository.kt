@@ -3,23 +3,27 @@ package com.vidyanova.ai.data.repository
 import android.content.Context
 import com.vidyanova.ai.ai.inference.LocalModelEngine
 import com.vidyanova.ai.ai.instruction.PromptBuilder
+import com.vidyanova.ai.ai.instruction.StyleDetector
 import com.vidyanova.ai.ai.retrieval.CurriculumRetriever
-import com.vidyanova.ai.ai.safety.CurriculumGuard
 import com.vidyanova.ai.ai.retrieval.VectorStore
+import com.vidyanova.ai.ai.safety.CurriculumGuard
 
 data class TutorResult(
     val success: Boolean,
     val answer: String,
-    val message: String = ""
+    val mode: String,
+    val language: String,
+    val blocked: Boolean = false
 )
 
 class TutorRepository(
-    context: Context,
-    private val curriculumRetriever: CurriculumRetriever,
-    private val modelEngine: LocalModelEngine
+    context: Context
 ) {
 
-    fun ask(
+    private val modelEngine = LocalModelEngine(context)
+    private val curriculumRetriever = CurriculumRetriever(VectorStore())
+
+    fun askTutor(
         question: String,
         classLevel: Int,
         subject: String,
@@ -27,47 +31,55 @@ class TutorRepository(
         topic: String? = null
     ): TutorResult {
 
+        if (question.isBlank()) {
+            return TutorResult(
+                success = false,
+                answer = "Please apna question likho.",
+                mode = "SIMPLE",
+                language = "english"
+            )
+        }
+
         val guardResult = CurriculumGuard.check(question)
 
         if (!guardResult.allowed) {
             return TutorResult(
                 success = false,
-                answer = "",
-                message = guardResult.message
+                answer = guardResult.message,
+                mode = "SIMPLE",
+                language = StyleDetector.detect(question).language,
+                blocked = true
             )
         }
 
-        return try {
-            val curriculumContext =
-                curriculumRetriever.buildContext(
-                    question = question,
-                    classLevel = classLevel,
-                    subject = subject
-                )
+        val style = StyleDetector.detect(question)
 
-            val prompt = PromptBuilder.build(
-                question = question,
-                classLevel = classLevel,
-                subject = subject,
-                chapter = chapter,
-                topic = topic,
-                curriculumContext = curriculumContext
-            )
+        val curriculumContext = curriculumRetriever.buildContext(
+            question = question,
+            classLevel = classLevel,
+            subject = subject
+        )
 
-            val response = modelEngine.generate(prompt)
+        val prompt = PromptBuilder.build(
+            question = question,
+            classLevel = classLevel,
+            subject = subject,
+            chapter = chapter,
+            topic = topic,
+            curriculumContext = curriculumContext
+        )
 
-            TutorResult(
-                success = true,
-                answer = response.text
-            )
+        val answer = modelEngine.generate(prompt).text
 
-        } catch (error: Exception) {
-            TutorResult(
-                success = false,
-                answer = "",
-                message = error.message
-                    ?: "ViyaAI could not generate an answer."
-            )
-        }
+        return TutorResult(
+            success = true,
+            answer = answer,
+            mode = style.mode.name,
+            language = style.language
+        )
+    }
+
+    fun releaseModel() {
+        modelEngine.unloadModel()
     }
 }
