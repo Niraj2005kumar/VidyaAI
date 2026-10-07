@@ -1,0 +1,304 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.6.0"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						5
+					]
+				},
+				{
+					"build" : "llama.cpp",
+					"childIndexes" : 
+					[
+						2,
+						5,
+						6
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-llama.cpp-Debug-dadd46dac8fefbe964e8.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 1,
+					"source" : "C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp"
+				},
+				{
+					"build" : "llama.cpp/ggml",
+					"childIndexes" : 
+					[
+						3
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-llama.cpp.ggml-Debug-f2a9789cee09ab76cc60.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"parentIndex" : 1,
+					"projectIndex" : 2,
+					"source" : "C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp/ggml"
+				},
+				{
+					"build" : "llama.cpp/ggml/src",
+					"childIndexes" : 
+					[
+						4
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-llama.cpp.ggml.src-Debug-07c16dfde61ec31b6384.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 2,
+					"source" : "C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp/ggml/src",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				},
+				{
+					"build" : "llama.cpp/ggml/src/ggml-cpu",
+					"jsonFile" : "directory-llama.cpp.ggml.src.ggml-cpu-Debug-556256fec54d5857225a.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"parentIndex" : 3,
+					"projectIndex" : 2,
+					"source" : "C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp/ggml/src/ggml-cpu"
+				},
+				{
+					"build" : "llama.cpp/src",
+					"jsonFile" : "directory-llama.cpp.src-Debug-45ca06f291e0b58fa90b.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"parentIndex" : 1,
+					"projectIndex" : 1,
+					"source" : "C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp/src",
+					"targetIndexes" : 
+					[
+						3
+					]
+				},
+				{
+					"build" : "llama.cpp/vendor",
+					"childIndexes" : 
+					[
+						7,
+						8,
+						9,
+						10,
+						11
+					],
+					"jsonFile" : "directory-llama.cpp.vendor-Debug-eb91d9d8bedfefa44cd4.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"parentIndex" : 1,
+					"projectIndex" : 1,
+					"source" : "C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp/vendor"
+				},
+				{
+					"build" : "llama.cpp/vendor/hash",
+					"jsonFile" : "directory-llama.cpp.vendor.hash-Debug-e222ac5666919acea6ba.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"parentIndex" : 6,
+					"projectIndex" : 1,
+					"source" : "C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp/vendor/hash",
+					"targetIndexes" : 
+					[
+						4
+					]
+				},
+				{
+					"build" : "llama.cpp/vendor/miniaudio",
+					"jsonFile" : "directory-llama.cpp.vendor.miniaudio-Debug-b7fbdcc64013e99755e3.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"parentIndex" : 6,
+					"projectIndex" : 1,
+					"source" : "C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp/vendor/miniaudio"
+				},
+				{
+					"build" : "llama.cpp/vendor/nlohmann",
+					"jsonFile" : "directory-llama.cpp.vendor.nlohmann-Debug-a390b38c0a0a5c211b96.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"parentIndex" : 6,
+					"projectIndex" : 1,
+					"source" : "C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp/vendor/nlohmann"
+				},
+				{
+					"build" : "llama.cpp/vendor/sheredom",
+					"jsonFile" : "directory-llama.cpp.vendor.sheredom-Debug-05be8c09961452cb9b23.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"parentIndex" : 6,
+					"projectIndex" : 1,
+					"source" : "C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp/vendor/sheredom"
+				},
+				{
+					"build" : "llama.cpp/vendor/stb",
+					"jsonFile" : "directory-llama.cpp.vendor.stb-Debug-11c7aa0803942191c2cc.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"parentIndex" : 6,
+					"projectIndex" : 1,
+					"source" : "C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp/vendor/stb"
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"childIndexes" : 
+					[
+						1
+					],
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "vidyanova",
+					"targetIndexes" : 
+					[
+						5
+					]
+				},
+				{
+					"childIndexes" : 
+					[
+						2
+					],
+					"directoryIndexes" : 
+					[
+						1,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10,
+						11
+					],
+					"name" : "llama.cpp",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						3,
+						4
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						2,
+						3,
+						4
+					],
+					"name" : "ggml",
+					"parentIndex" : 1,
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 3,
+					"id" : "ggml::@94de48a0d5830e0c5d2f",
+					"jsonFile" : "target-ggml-Debug-b719b080d23d9ca6be02.json",
+					"name" : "ggml",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "ggml-base::@94de48a0d5830e0c5d2f",
+					"jsonFile" : "target-ggml-base-Debug-7ed36a1ba5cb2f89a5f3.json",
+					"name" : "ggml-base",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "ggml-cpu::@94de48a0d5830e0c5d2f",
+					"jsonFile" : "target-ggml-cpu-Debug-69117e8e0f5a460fd792.json",
+					"name" : "ggml-cpu",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 5,
+					"id" : "llama::@fb8c1886b26de7beabc1",
+					"jsonFile" : "target-llama-Debug-4788a77ca49c6220e50b.json",
+					"name" : "llama",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 7,
+					"id" : "vendor-hash::@33048eebb93bf90e24ac",
+					"jsonFile" : "target-vendor-hash-Debug-46294d9c5900a1de5c6c.json",
+					"name" : "vendor-hash",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "vidyanova_native::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-vidyanova_native-Debug-a175cab5a1c0ccf51e11.json",
+					"name" : "vidyanova_native",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/app/.cxx/Debug/70425w2u/arm64-v8a",
+		"source" : "C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/app/src/main/cpp"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

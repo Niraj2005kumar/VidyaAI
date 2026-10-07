@@ -1,0 +1,10 @@
+prefix=C:/Program Files (x86)/vidyanova
+exec_prefix=C:/Program Files (x86)/vidyanova
+libdir=C:/Program Files (x86)/vidyanova/lib
+includedir=C:/Program Files (x86)/vidyanova/include
+
+Name: llama
+Description: Port of Facebook's LLaMA model in C/C++
+Version: 0.6.0-dev
+Libs: -L${libdir} -lggml -lggml-base -lllama
+Cflags: -I${includedir}

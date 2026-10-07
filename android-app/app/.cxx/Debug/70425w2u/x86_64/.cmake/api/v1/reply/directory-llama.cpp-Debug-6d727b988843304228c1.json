@@ -1,0 +1,89 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"install"
+		],
+		"files" : 
+		[
+			"C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 290,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 309,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 317,
+				"parent" : 0
+			}
+		]
+	},
+	"installers" : 
+	[
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "lib",
+			"paths" : 
+			[
+				"bin/libllama.so"
+			],
+			"targetId" : "llama::@fb8c1886b26de7beabc1",
+			"targetIndex" : 3,
+			"type" : "target"
+		},
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "include",
+			"paths" : 
+			[
+				"C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp/include/llama.h",
+				"C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp/include/llama-cpp.h"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 2,
+			"component" : "Unspecified",
+			"destination" : "lib/cmake/llama",
+			"paths" : 
+			[
+				"C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/app/.cxx/Debug/70425w2u/x86_64/llama.cpp/llama-config.cmake",
+				"C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/app/.cxx/Debug/70425w2u/x86_64/llama.cpp/llama-config-version.cmake"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 3,
+			"component" : "Unspecified",
+			"destination" : "lib/pkgconfig",
+			"paths" : 
+			[
+				"C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/app/.cxx/Debug/70425w2u/x86_64/llama.cpp/llama.pc"
+			],
+			"type" : "file"
+		}
+	],
+	"paths" : 
+	{
+		"build" : "llama.cpp",
+		"source" : "C:/Users/niraj/OneDrive/Desktop/VidyaAI/android-app/llama.cpp"
+	}
+}

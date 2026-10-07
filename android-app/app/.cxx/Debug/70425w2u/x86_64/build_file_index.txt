@@ -1,0 +1,12 @@
+C:\Users\niraj\OneDrive\Desktop\VidyaAI\android-app\app\src\main\cpp\CMakeLists.txt
+C:\Users\niraj\OneDrive\Desktop\VidyaAI\android-app\llama.cpp\CMakeLists.txt
+C:\Users\niraj\OneDrive\Desktop\VidyaAI\android-app\llama.cpp\ggml\CMakeLists.txt
+C:\Users\niraj\OneDrive\Desktop\VidyaAI\android-app\llama.cpp\ggml\src\CMakeLists.txt
+C:\Users\niraj\OneDrive\Desktop\VidyaAI\android-app\llama.cpp\ggml\src\ggml-cpu\CMakeLists.txt
+C:\Users\niraj\OneDrive\Desktop\VidyaAI\android-app\llama.cpp\src\CMakeLists.txt
+C:\Users\niraj\OneDrive\Desktop\VidyaAI\android-app\llama.cpp\vendor\CMakeLists.txt
+C:\Users\niraj\OneDrive\Desktop\VidyaAI\android-app\llama.cpp\vendor\hash\CMakeLists.txt
+C:\Users\niraj\OneDrive\Desktop\VidyaAI\android-app\llama.cpp\vendor\miniaudio\CMakeLists.txt
+C:\Users\niraj\OneDrive\Desktop\VidyaAI\android-app\llama.cpp\vendor\nlohmann\CMakeLists.txt
+C:\Users\niraj\OneDrive\Desktop\VidyaAI\android-app\llama.cpp\vendor\sheredom\CMakeLists.txt
+C:\Users\niraj\OneDrive\Desktop\VidyaAI\android-app\llama.cpp\vendor\stb\CMakeLists.txt

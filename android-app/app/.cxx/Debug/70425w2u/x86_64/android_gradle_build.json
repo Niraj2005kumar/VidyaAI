@@ -1,0 +1,101 @@
+{
+  "buildFiles": [
+    "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\src\\main\\cpp\\CMakeLists.txt",
+    "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\llama.cpp\\CMakeLists.txt",
+    "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\llama.cpp\\ggml\\CMakeLists.txt",
+    "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\llama.cpp\\ggml\\src\\CMakeLists.txt",
+    "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\llama.cpp\\ggml\\src\\ggml-cpu\\CMakeLists.txt",
+    "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\llama.cpp\\src\\CMakeLists.txt",
+    "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\llama.cpp\\vendor\\CMakeLists.txt",
+    "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\llama.cpp\\vendor\\hash\\CMakeLists.txt",
+    "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\llama.cpp\\vendor\\miniaudio\\CMakeLists.txt",
+    "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\llama.cpp\\vendor\\nlohmann\\CMakeLists.txt",
+    "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\llama.cpp\\vendor\\sheredom\\CMakeLists.txt",
+    "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\llama.cpp\\vendor\\stb\\CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "C:\\Users\\niraj\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+      "-C",
+      "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "C:\\Users\\niraj\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+    "-C",
+    "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "ggml::@94de48a0d5830e0c5d2f": {
+      "toolchain": "toolchain",
+      "abi": "x86_64",
+      "artifactName": "ggml",
+      "output": "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\bin\\libggml.so",
+      "runtimeFiles": [
+        "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\bin\\libggml-cpu.so",
+        "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\bin\\libggml-base.so"
+      ]
+    },
+    "ggml-base::@94de48a0d5830e0c5d2f": {
+      "toolchain": "toolchain",
+      "abi": "x86_64",
+      "artifactName": "ggml-base",
+      "output": "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\bin\\libggml-base.so",
+      "runtimeFiles": []
+    },
+    "ggml-cpu::@94de48a0d5830e0c5d2f": {
+      "toolchain": "toolchain",
+      "abi": "x86_64",
+      "artifactName": "ggml-cpu",
+      "output": "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\bin\\libggml-cpu.so",
+      "runtimeFiles": [
+        "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\bin\\libggml-base.so"
+      ]
+    },
+    "llama::@fb8c1886b26de7beabc1": {
+      "toolchain": "toolchain",
+      "abi": "x86_64",
+      "artifactName": "llama",
+      "output": "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\bin\\libllama.so",
+      "runtimeFiles": [
+        "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\bin\\libggml.so",
+        "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\bin\\libggml-cpu.so",
+        "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\bin\\libggml-base.so"
+      ]
+    },
+    "vendor-hash::@33048eebb93bf90e24ac": {
+      "toolchain": "toolchain",
+      "abi": "x86_64",
+      "artifactName": "vendor-hash",
+      "output": "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\llama.cpp\\vendor\\hash\\libvendor-hash.a"
+    },
+    "vidyanova_native::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "x86_64",
+      "artifactName": "vidyanova_native",
+      "output": "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\build\\intermediates\\cxx\\Debug\\70425w2u\\obj\\x86_64\\libvidyanova_native.so",
+      "runtimeFiles": [
+        "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\bin\\libllama.so",
+        "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\bin\\libggml.so",
+        "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\bin\\libggml-cpu.so",
+        "C:\\Users\\niraj\\OneDrive\\Desktop\\VidyaAI\\android-app\\app\\.cxx\\Debug\\70425w2u\\x86_64\\bin\\libggml-base.so"
+      ]
+    }
+  },
+  "toolchains": {
+    "toolchain": {
+      "cCompilerExecutable": "C:\\Users\\niraj\\AppData\\Local\\Android\\Sdk\\ndk\\26.1.10909125\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe",
+      "cppCompilerExecutable": "C:\\Users\\niraj\\AppData\\Local\\Android\\Sdk\\ndk\\26.1.10909125\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe"
+    }
+  },
+  "cFileExtensions": [
+    "c"
+  ],
+  "cppFileExtensions": [
+    "cpp",
+    "cxx",
+    "c"
+  ]
+}
