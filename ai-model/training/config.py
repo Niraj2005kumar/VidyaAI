@@ -1,0 +1,22 @@
+MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
+
+DATASET_PATH = "../dataset/class_01/training.jsonl"
+
+OUTPUT_DIR = "../models/finetuned/vidyanova-qwen-1.5b"
+
+MAX_SEQ_LENGTH = 2048
+
+LORA_R = 16
+LORA_ALPHA = 32
+LORA_DROPOUT = 0.05
+
+BATCH_SIZE = 2
+GRADIENT_ACCUMULATION_STEPS = 4
+
+LEARNING_RATE = 2e-4
+NUM_EPOCHS = 2
+
+WARMUP_STEPS = 10
+
+SAVE_STEPS = 100
+LOGGING_STEPS = 10
