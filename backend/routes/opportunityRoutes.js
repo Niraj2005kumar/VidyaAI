@@ -4,9 +4,6 @@ import authMiddleware from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// ======================================
-// CREATE OPPORTUNITY
-// ======================================
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const {
@@ -19,6 +16,7 @@ router.post('/', authMiddleware, async (req, res) => {
       applicationStartDate,
       applicationDeadline,
       officialLink,
+      isActive,
       isFeatured,
     } = req.body;
 
@@ -29,17 +27,34 @@ router.post('/', authMiddleware, async (req, res) => {
       });
     }
 
+    const allowedTypes = [
+      'scholarship',
+      'exam',
+      'hackathon',
+      'competition',
+      'admission',
+      'other',
+    ];
+
+    if (!allowedTypes.includes(type)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid opportunity type',
+      });
+    }
+
     const opportunity = await Opportunity.create({
-      title,
-      description,
+      title: title.trim(),
+      description: description.trim(),
       type,
-      classLevels,
-      organization,
-      eligibility,
-      applicationStartDate,
-      applicationDeadline,
-      officialLink,
-      isFeatured: isFeatured || false,
+      classLevels: Array.isArray(classLevels) ? classLevels.map(Number) : [],
+      organization: organization?.trim() || '',
+      eligibility: eligibility?.trim() || '',
+      applicationStartDate: applicationStartDate || null,
+      applicationDeadline: applicationDeadline || null,
+      officialLink: officialLink?.trim() || '',
+      isActive: isActive !== undefined ? Boolean(isActive) : true,
+      isFeatured: isFeatured !== undefined ? Boolean(isFeatured) : false,
     });
 
     res.status(201).json({
@@ -57,30 +72,22 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
-// ======================================
-// GET ALL ACTIVE OPPORTUNITIES
-// ======================================
-router.get('/', async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { type, classLevel, featured } = req.query;
-
     const filter = {
       isActive: true,
     };
 
-    if (type) {
-      filter.type = type;
+    if (req.query.type) {
+      filter.type = req.query.type;
     }
 
-    if (classLevel) {
-      filter.classLevels = Number(classLevel);
-    }
-
-    if (featured === 'true') {
-      filter.isFeatured = true;
+    if (req.query.classLevel) {
+      filter.classLevels = Number(req.query.classLevel);
     }
 
     const opportunities = await Opportunity.find(filter).sort({
+      isFeatured: -1,
       applicationDeadline: 1,
     });
 
@@ -94,20 +101,14 @@ router.get('/', async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Failed to get opportunities',
+      message: 'Failed to fetch opportunities',
     });
   }
 });
 
-// ======================================
-// GET SINGLE OPPORTUNITY
-// ======================================
-router.get('/:opportunityId', async (req, res) => {
+router.get('/:id', authMiddleware, async (req, res) => {
   try {
-    const opportunity = await Opportunity.findOne({
-      _id: req.params.opportunityId,
-      isActive: true,
-    });
+    const opportunity = await Opportunity.findById(req.params.id);
 
     if (!opportunity) {
       return res.status(404).json({
@@ -125,15 +126,12 @@ router.get('/:opportunityId', async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Failed to get opportunity',
+      message: 'Failed to fetch opportunity',
     });
   }
 });
 
-// ======================================
-// GET UPCOMING DEADLINES
-// ======================================
-router.get('/upcoming/deadlines', async (req, res) => {
+router.get('/upcoming/deadlines', authMiddleware, async (req, res) => {
   try {
     const today = new Date();
 
@@ -154,11 +152,95 @@ router.get('/upcoming/deadlines', async (req, res) => {
       opportunities,
     });
   } catch (error) {
-    console.error('Get upcoming deadlines error:', error);
+    console.error('Upcoming deadlines error:', error);
 
     res.status(500).json({
       success: false,
-      message: 'Failed to get upcoming deadlines',
+      message: 'Failed to fetch upcoming deadlines',
+    });
+  }
+});
+
+router.put('/:id', authMiddleware, async (req, res) => {
+  try {
+    const allowedFields = [
+      'title',
+      'description',
+      'type',
+      'classLevels',
+      'organization',
+      'eligibility',
+      'applicationStartDate',
+      'applicationDeadline',
+      'officialLink',
+      'isActive',
+      'isFeatured',
+    ];
+
+    const updates = {};
+
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    }
+
+    if (updates.classLevels) {
+      updates.classLevels = updates.classLevels.map(Number);
+    }
+
+    const opportunity = await Opportunity.findByIdAndUpdate(
+      req.params.id,
+      updates,
+      {
+        new: true,
+        runValidators: true,
+      },
+    );
+
+    if (!opportunity) {
+      return res.status(404).json({
+        success: false,
+        message: 'Opportunity not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Opportunity updated successfully',
+      opportunity,
+    });
+  } catch (error) {
+    console.error('Update opportunity error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update opportunity',
+    });
+  }
+});
+
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    const opportunity = await Opportunity.findByIdAndDelete(req.params.id);
+
+    if (!opportunity) {
+      return res.status(404).json({
+        success: false,
+        message: 'Opportunity not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Opportunity deleted successfully',
+    });
+  } catch (error) {
+    console.error('Delete opportunity error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete opportunity',
     });
   }
 });

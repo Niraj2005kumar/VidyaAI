@@ -3,7 +3,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
-import quizRoutes from './routes/quizRoutes.js';
 
 import connectDB from './config/db.js';
 
@@ -13,23 +12,22 @@ import studyRoutes from './routes/studyRoutes.js';
 import quizRoutes from './routes/quizRoutes.js';
 import progressRoutes from './routes/progressRoutes.js';
 import opportunityRoutes from './routes/opportunityRoutes.js';
-import progressRoutes from './routes/progressRoutes.js';
-import studyRoutes from './routes/studyRoutes.js';
+import parentRoutes from './routes/parentRoutes.js';
+import tutorRoutes from './routes/tutorRoutes.js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
+connectDB();
+
 app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Root
 app.get('/', (req, res) => {
   res.json({
     success: true,
@@ -38,7 +36,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
@@ -47,18 +44,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/study', studyRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/progress', progressRoutes);
-app.use('/api/study', studyRoutes);
-app.use('/api/progress', progressRoutes);
-app.use('/api/quizzes', quizRoutes);
 app.use('/api/opportunities', opportunityRoutes);
+app.use('/api/parent', parentRoutes);
+app.use('/api/tutor', tutorRoutes);
 
-// 404 Handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -66,9 +60,8 @@ app.use((req, res) => {
   });
 });
 
-// Global Error Handler
 app.use((err, req, res, next) => {
-  console.error('❌ Server Error:', err);
+  console.error('Server Error:', err);
 
   res.status(err.status || 500).json({
     success: false,
@@ -76,14 +69,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start the API only after the database connection is ready.
-const startServer = async () => {
-  await connectDB();
-
-  app.listen(PORT, () => {
-    console.log(`🚀 VidyaNova Backend running on port ${PORT}`);
-    console.log(`📡 Local URL: http://localhost:${PORT}`);
-  });
-};
-
-startServer();
+app.listen(PORT, () => {
+  console.log(`VidyaNova Backend running on port ${PORT}`);
+  console.log(`Local URL: http://localhost:${PORT}`);
+});

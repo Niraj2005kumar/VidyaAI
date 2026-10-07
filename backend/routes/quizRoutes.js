@@ -1,11 +1,14 @@
 import express from 'express';
-import authMiddleware from '../middleware/authMiddleware.js';
 import Quiz from '../models/Quiz.js';
 import QuizAttempt from '../models/QuizAttempt.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Create a quiz
+/*
+  POST /api/quizzes/
+  Create a quiz
+*/
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { title, classLevel, subject, chapter, questions } = req.body;
@@ -13,15 +16,15 @@ router.post('/', authMiddleware, async (req, res) => {
     if (!title || !classLevel || !subject || !questions?.length) {
       return res.status(400).json({
         success: false,
-        message: 'title, classLevel, subject and questions are required',
+        message: 'Title, class level, subject and questions are required',
       });
     }
 
     const quiz = await Quiz.create({
-      title,
-      classLevel,
-      subject,
-      chapter: chapter || null,
+      title: title.trim(),
+      classLevel: Number(classLevel),
+      subject: subject.trim(),
+      chapter: chapter?.trim() || '',
       questions,
       createdBy: req.user.id,
     });
@@ -29,10 +32,10 @@ router.post('/', authMiddleware, async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Quiz created successfully',
-      data: quiz,
+      quiz,
     });
   } catch (error) {
-    console.error('Create quiz error:', error.message);
+    console.error('Create quiz error:', error);
 
     res.status(500).json({
       success: false,
@@ -41,7 +44,10 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
-// Get all quizzes
+/*
+  GET /api/quizzes/
+  Get quizzes
+*/
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const filter = {};
@@ -62,13 +68,13 @@ router.get('/', authMiddleware, async (req, res) => {
       .select('-questions.correctAnswer')
       .sort({ createdAt: -1 });
 
-    res.json({
+    res.status(200).json({
       success: true,
       count: quizzes.length,
-      data: quizzes,
+      quizzes,
     });
   } catch (error) {
-    console.error('Get quizzes error:', error.message);
+    console.error('Get quizzes error:', error);
 
     res.status(500).json({
       success: false,
@@ -77,7 +83,10 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-// Get one quiz
+/*
+  GET /api/quizzes/:id
+  Get one quiz
+*/
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const quiz = await Quiz.findById(req.params.id);
@@ -89,12 +98,12 @@ router.get('/:id', authMiddleware, async (req, res) => {
       });
     }
 
-    res.json({
+    res.status(200).json({
       success: true,
-      data: quiz,
+      quiz,
     });
   } catch (error) {
-    console.error('Get quiz error:', error.message);
+    console.error('Get quiz error:', error);
 
     res.status(500).json({
       success: false,
@@ -103,7 +112,10 @@ router.get('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Submit quiz attempt
+/*
+  POST /api/quizzes/:id/submit
+  Submit quiz
+*/
 router.post('/:id/submit', authMiddleware, async (req, res) => {
   try {
     const { answers } = req.body;
@@ -126,16 +138,12 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
 
     let correctAnswers = 0;
 
-    const evaluatedAnswers = quiz.questions.map((question) => {
-      const submitted = answers.find(
-        (answer) => String(answer.questionId) === String(question._id),
-      );
+    const evaluatedAnswers = quiz.questions.map((question, index) => {
+      const submitted = answers[index];
 
-      const selectedAnswer = submitted ? submitted.selectedAnswer : null;
+      const selectedAnswer = submitted?.selectedAnswer ?? submitted ?? null;
 
-      const correct =
-        selectedAnswer !== null &&
-        String(selectedAnswer) === String(question.correctAnswer);
+      const correct = String(selectedAnswer) === String(question.correctAnswer);
 
       if (correct) {
         correctAnswers++;
@@ -169,17 +177,20 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Quiz submitted successfully',
-      data: {
+      result: {
         attemptId: attempt._id,
         score: correctAnswers,
         totalQuestions,
         correctAnswers,
         percentage,
-        answers: evaluatedAnswers,
+        answers: evaluatedAnswers.map((answer, index) => ({
+          ...answer,
+          explanation: quiz.questions[index]?.explanation || '',
+        })),
       },
     });
   } catch (error) {
-    console.error('Submit quiz error:', error.message);
+    console.error('Submit quiz error:', error);
 
     res.status(500).json({
       success: false,
@@ -188,22 +199,26 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
   }
 });
 
-// Get user's quiz attempts
+/*
+  GET /api/quizzes/attempts/my
+  Get logged-in user's quiz attempts
+*/
 router.get('/attempts/my', authMiddleware, async (req, res) => {
   try {
     const attempts = await QuizAttempt.find({
       user: req.user.id,
     })
       .populate('quiz', 'title classLevel subject chapter')
-      .sort({ completedAt: -1 });
+      .sort({ completedAt: -1 })
+      .limit(100);
 
-    res.json({
+    res.status(200).json({
       success: true,
       count: attempts.length,
-      data: attempts,
+      attempts,
     });
   } catch (error) {
-    console.error('Get attempts error:', error.message);
+    console.error('Get quiz attempts error:', error);
 
     res.status(500).json({
       success: false,

@@ -1,82 +1,82 @@
 import express from 'express';
-
-import authMiddleware from '../middleware/authMiddleware.js';
+import User from '../models/User.js';
 import StudySession from '../models/StudySession.js';
 import QuizAttempt from '../models/QuizAttempt.js';
 import Progress from '../models/Progress.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 
 const router = express.Router();
-
-/*
-    GET /api/parent/child/:userId/overview
-
-    Parent dashboard overview:
-    - Total study time
-    - Quiz performance
-    - Weak areas
-    - Recent study activity
-*/
 
 router.get('/child/:userId/overview', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Total study time
-    const studySessions = await StudySession.find({
-      user: userId,
-    }).sort({ createdAt: -1 });
+    const child = await User.findById(userId).select(
+      'name email role classLevel preferredLanguage',
+    );
 
-    const totalStudyTime = studySessions.reduce((total, session) => {
-      return total + (session.durationMinutes || 0);
-    }, 0);
+    if (!child) {
+      return res.status(404).json({
+        success: false,
+        message: 'Student not found',
+      });
+    }
 
-    // Quiz attempts
-    const quizAttempts = await QuizAttempt.find({
-      user: userId,
-    }).sort({ completedAt: -1 });
+    const [progress, studySessions, quizAttempts] = await Promise.all([
+      Progress.find({ user: userId }).sort({ lastStudiedAt: -1 }),
+      StudySession.find({ user: userId }).sort({ startTime: -1 }).limit(100),
+      QuizAttempt.find({ user: userId }).sort({ completedAt: -1 }).limit(100),
+    ]);
+
+    const totalStudyTimeMinutes = studySessions.reduce(
+      (total, session) => total + (session.durationMinutes || 0),
+      0,
+    );
 
     const totalQuizzes = quizAttempts.length;
 
-    const averageScore =
+    const averageQuizScore =
       totalQuizzes > 0
-        ? quizAttempts.reduce(
-            (total, attempt) => total + (attempt.percentage || 0),
-            0,
-          ) / totalQuizzes
+        ? Number(
+            (
+              quizAttempts.reduce(
+                (total, attempt) => total + (attempt.percentage || 0),
+                0,
+              ) / totalQuizzes
+            ).toFixed(2),
+          )
         : 0;
 
-    // Weak areas
-    const weakAreas = await Progress.find({
-      user: userId,
-      isWeakArea: true,
-    }).sort({ lastStudiedAt: -1 });
+    const weakAreas = progress.filter((item) => item.isWeakArea === true);
 
-    res.json({
+    const masteredTopics = progress.filter(
+      (item) => item.masteryLevel === 'mastered',
+    );
+
+    res.status(200).json({
       success: true,
-      data: {
-        totalStudyTimeMinutes: totalStudyTime,
+      student: child,
+      summary: {
+        totalStudyTimeMinutes,
         totalQuizzes,
-        averageQuizScore: Number(averageScore.toFixed(2)),
-        weakAreas,
-        recentStudySessions: studySessions.slice(0, 10),
-        recentQuizAttempts: quizAttempts.slice(0, 10),
+        averageQuizScore,
+        totalTopics: progress.length,
+        masteredTopics: masteredTopics.length,
+        weakAreas: weakAreas.length,
       },
+      weakAreas,
+      recentStudySessions: studySessions.slice(0, 10),
+      recentQuizAttempts: quizAttempts.slice(0, 10),
     });
   } catch (error) {
-    console.error('Parent dashboard error:', error.message);
+    console.error('Parent overview error:', error);
 
     res.status(500).json({
       success: false,
-      message: 'Failed to load parent dashboard',
+      message: 'Failed to fetch student overview',
     });
   }
 });
-
-/*
-    GET /api/parent/child/:userId/study-summary
-
-    Study time summary for parent.
-*/
 
 router.get('/child/:userId/study-summary', authMiddleware, async (req, res) => {
   try {
@@ -84,36 +84,40 @@ router.get('/child/:userId/study-summary', authMiddleware, async (req, res) => {
 
     const sessions = await StudySession.find({
       user: userId,
-    }).sort({ startTime: -1 });
+    }).sort({
+      startTime: -1,
+    });
 
-    const summary = sessions.map((session) => ({
-      subject: session.subject,
-      topic: session.topic,
-      durationMinutes: session.durationMinutes,
-      startTime: session.startTime,
-      endTime: session.endTime,
-    }));
+    const totalMinutes = sessions.reduce(
+      (total, session) => total + (session.durationMinutes || 0),
+      0,
+    );
 
-    res.json({
+    const subjectTime = {};
+
+    for (const session of sessions) {
+      const subject = session.subject || 'Unknown';
+
+      subjectTime[subject] =
+        (subjectTime[subject] || 0) + (session.durationMinutes || 0);
+    }
+
+    res.status(200).json({
       success: true,
-      count: summary.length,
-      data: summary,
+      totalStudyTimeMinutes: totalMinutes,
+      totalStudyTimeHours: Number((totalMinutes / 60).toFixed(2)),
+      subjectTime,
+      sessions,
     });
   } catch (error) {
-    console.error('Study summary error:', error.message);
+    console.error('Parent study summary error:', error);
 
     res.status(500).json({
       success: false,
-      message: 'Failed to load study summary',
+      message: 'Failed to fetch study summary',
     });
   }
 });
-
-/*
-    GET /api/parent/child/:userId/progress
-
-    Academic progress for parent.
-*/
 
 router.get('/child/:userId/progress', authMiddleware, async (req, res) => {
   try {
@@ -125,17 +129,45 @@ router.get('/child/:userId/progress', authMiddleware, async (req, res) => {
       lastStudiedAt: -1,
     });
 
-    res.json({
+    const summary = {
+      totalTopics: progress.length,
+      mastered: 0,
+      good: 0,
+      learning: 0,
+      beginner: 0,
+      notStarted: 0,
+      weakAreas: 0,
+    };
+
+    for (const item of progress) {
+      if (item.masteryLevel === 'mastered') {
+        summary.mastered++;
+      } else if (item.masteryLevel === 'good') {
+        summary.good++;
+      } else if (item.masteryLevel === 'learning') {
+        summary.learning++;
+      } else if (item.masteryLevel === 'beginner') {
+        summary.beginner++;
+      } else {
+        summary.notStarted++;
+      }
+
+      if (item.isWeakArea) {
+        summary.weakAreas++;
+      }
+    }
+
+    res.status(200).json({
       success: true,
-      count: progress.length,
-      data: progress,
+      summary,
+      progress,
     });
   } catch (error) {
-    console.error('Parent progress error:', error.message);
+    console.error('Parent progress error:', error);
 
     res.status(500).json({
       success: false,
-      message: 'Failed to load student progress',
+      message: 'Failed to fetch student progress',
     });
   }
 });

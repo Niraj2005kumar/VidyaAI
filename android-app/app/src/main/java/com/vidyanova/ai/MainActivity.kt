@@ -8,12 +8,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import com.vidyanova.ai.data.network.AuthTokenStore
 import com.vidyanova.ai.navigation.VidyaNovaNavHost
 import com.vidyanova.ai.ui.theme.VidyaNovaTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AuthTokenStore.initialize(applicationContext)
         enableEdgeToEdge()
         setContent {
             VidyaNovaTheme {

@@ -3,24 +3,10 @@ import authMiddleware from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-/*
-    POST /api/tutor/question
-
-    This endpoint stores/handles tutor request metadata.
-    Actual AI inference will remain on-device.
-*/
-
 router.post('/question', authMiddleware, async (req, res) => {
   try {
-    const {
-      question,
-      classLevel,
-      subject,
-      chapter,
-      topic,
-      language,
-      teachingStyle,
-    } = req.body;
+    const { question, classLevel, subject, topic, language, teachingStyle } =
+      req.body;
 
     if (!question || !question.trim()) {
       return res.status(400).json({
@@ -29,36 +15,42 @@ router.post('/question', authMiddleware, async (req, res) => {
       });
     }
 
-    if (!classLevel) {
-      return res.status(400).json({
-        success: false,
-        message: 'Class level is required',
-      });
-    }
+    const validLanguages = ['english', 'hindi', 'hinglish'];
 
-    if (classLevel < 1 || classLevel > 10) {
-      return res.status(400).json({
-        success: false,
-        message: 'Class level must be between 1 and 10',
-      });
-    }
+    const validStyles = [
+      'simple',
+      'detailed',
+      'step-by-step',
+      'example-based',
+      'exam-ready',
+      'basic',
+    ];
 
-    res.json({
+    const selectedLanguage = validLanguages.includes(language)
+      ? language
+      : 'english';
+
+    const selectedStyle = validStyles.includes(teachingStyle)
+      ? teachingStyle
+      : 'simple';
+
+    res.status(200).json({
       success: true,
-      message: 'Tutor question received',
+      message: 'Question received',
       data: {
-        question,
-        classLevel,
-        subject: subject || null,
-        chapter: chapter || null,
-        topic: topic || null,
-        language: language || 'english',
-        teachingStyle: teachingStyle || 'step-by-step',
-        inferenceMode: 'on-device',
+        question: question.trim(),
+        classLevel: classLevel ? Number(classLevel) : null,
+        subject: subject?.trim() || null,
+        topic: topic?.trim() || null,
+        language: selectedLanguage,
+        teachingStyle: selectedStyle,
+        userId: req.user.id,
+        mode: 'offline',
+        aiEngine: 'on-device',
       },
     });
   } catch (error) {
-    console.error('Tutor question error:', error.message);
+    console.error('Tutor question error:', error);
 
     res.status(500).json({
       success: false,
@@ -67,24 +59,23 @@ router.post('/question', authMiddleware, async (req, res) => {
   }
 });
 
-/*
-    GET /api/tutor/status
-
-    Returns information about the AI architecture.
-*/
-
 router.get('/status', authMiddleware, async (req, res) => {
-  res.json({
-    success: true,
-    data: {
-      tutorName: 'ViyaAI',
+  try {
+    res.status(200).json({
+      success: true,
+      status: 'ready',
       mode: 'offline',
-      inference: 'on-device',
-      model: 'Qwen2.5-1.5B',
-      quantization: 'Q4_K_M',
-      format: 'GGUF',
-    },
-  });
+      aiEngine: 'on-device',
+      internetRequired: false,
+    });
+  } catch (error) {
+    console.error('Tutor status error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get tutor status',
+    });
+  }
 });
 
 export default router;

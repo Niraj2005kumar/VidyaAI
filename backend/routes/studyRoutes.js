@@ -1,36 +1,38 @@
 import express from 'express';
-import authMiddleware from '../middleware/authMiddleware.js';
 import StudySession from '../models/StudySession.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Start a study session
+/*
+  POST /api/study/start
+  Start a new study session
+*/
 router.post('/start', authMiddleware, async (req, res) => {
   try {
     const { subject, topic } = req.body;
 
-    if (!subject) {
+    if (!subject || !topic) {
       return res.status(400).json({
         success: false,
-        message: 'Subject is required',
+        message: 'Subject and topic are required',
       });
     }
 
     const session = await StudySession.create({
       user: req.user.id,
-      subject,
-      topic: topic || null,
+      subject: subject.trim(),
+      topic: topic.trim(),
       startTime: new Date(),
-      durationMinutes: 0,
     });
 
     res.status(201).json({
       success: true,
       message: 'Study session started',
-      data: session,
+      session,
     });
   } catch (error) {
-    console.error('Start study session error:', error.message);
+    console.error('Start study session error:', error);
 
     res.status(500).json({
       success: false,
@@ -39,7 +41,10 @@ router.post('/start', authMiddleware, async (req, res) => {
   }
 });
 
-// End a study session
+/*
+  PUT /api/study/end/:id
+  End a study session
+*/
 router.put('/end/:id', authMiddleware, async (req, res) => {
   try {
     const session = await StudySession.findOne({
@@ -57,7 +62,7 @@ router.put('/end/:id', authMiddleware, async (req, res) => {
     if (session.endTime) {
       return res.status(400).json({
         success: false,
-        message: 'Study session already ended',
+        message: 'Study session is already completed',
       });
     }
 
@@ -73,13 +78,13 @@ router.put('/end/:id', authMiddleware, async (req, res) => {
 
     await session.save();
 
-    res.json({
+    res.status(200).json({
       success: true,
-      message: 'Study session ended',
-      data: session,
+      message: 'Study session completed',
+      session,
     });
   } catch (error) {
-    console.error('End study session error:', error.message);
+    console.error('End study session error:', error);
 
     res.status(500).json({
       success: false,
@@ -88,20 +93,25 @@ router.put('/end/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Get user's study history
+/*
+  GET /api/study/history
+  Get logged-in user's study history
+*/
 router.get('/history', authMiddleware, async (req, res) => {
   try {
     const sessions = await StudySession.find({
       user: req.user.id,
-    }).sort({ startTime: -1 });
+    })
+      .sort({ startTime: -1 })
+      .limit(100);
 
-    res.json({
+    res.status(200).json({
       success: true,
       count: sessions.length,
-      data: sessions,
+      sessions,
     });
   } catch (error) {
-    console.error('Study history error:', error.message);
+    console.error('Study history error:', error);
 
     res.status(500).json({
       success: false,
@@ -110,31 +120,41 @@ router.get('/history', authMiddleware, async (req, res) => {
   }
 });
 
-// Get total study time
+/*
+  GET /api/study/total-time
+  Get total study time
+*/
 router.get('/total-time', authMiddleware, async (req, res) => {
   try {
-    const sessions = await StudySession.find({
-      user: req.user.id,
-    });
-
-    const totalMinutes = sessions.reduce(
-      (total, session) => total + (session.durationMinutes || 0),
-      0,
-    );
-
-    res.json({
-      success: true,
-      data: {
-        totalStudyTimeMinutes: totalMinutes,
-        totalStudyTimeHours: Number((totalMinutes / 60).toFixed(2)),
+    const result = await StudySession.aggregate([
+      {
+        $match: {
+          user: req.user.id,
+        },
       },
+      {
+        $group: {
+          _id: null,
+          totalMinutes: {
+            $sum: '$durationMinutes',
+          },
+        },
+      },
+    ]);
+
+    const totalMinutes = result.length > 0 ? result[0].totalMinutes : 0;
+
+    res.status(200).json({
+      success: true,
+      totalMinutes,
+      totalHours: Number((totalMinutes / 60).toFixed(2)),
     });
   } catch (error) {
-    console.error('Total study time error:', error.message);
+    console.error('Total study time error:', error);
 
     res.status(500).json({
       success: false,
-      message: 'Failed to calculate study time',
+      message: 'Failed to calculate total study time',
     });
   }
 });

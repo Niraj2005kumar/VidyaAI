@@ -1,10 +1,13 @@
 import express from 'express';
-import authMiddleware from '../middleware/authMiddleware.js';
 import Progress from '../models/Progress.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Create or update topic progress
+/*
+  POST /api/progress/update
+  Create or update topic progress
+*/
 router.post('/update', authMiddleware, async (req, res) => {
   try {
     const {
@@ -20,61 +23,81 @@ router.post('/update', authMiddleware, async (req, res) => {
       isWeakArea,
     } = req.body;
 
-    if (!classLevel || !subject || !topic) {
+    if (!classLevel || !subject || !chapter || !topic) {
       return res.status(400).json({
         success: false,
-        message: 'classLevel, subject and topic are required',
+        message: 'Class, subject, chapter and topic are required',
       });
     }
 
     let progress = await Progress.findOne({
       user: req.user.id,
-      classLevel,
-      subject,
-      chapter: chapter || null,
-      topic,
+      classLevel: Number(classLevel),
+      subject: subject.trim(),
+      chapter: chapter.trim(),
+      topic: topic.trim(),
     });
 
-    if (progress) {
-      progress.questionsAsked = questionsAsked ?? progress.questionsAsked;
-
-      progress.quizzesAttempted = quizzesAttempted ?? progress.quizzesAttempted;
-
-      progress.averageScore = averageScore ?? progress.averageScore;
-
-      progress.studyTimeMinutes = studyTimeMinutes ?? progress.studyTimeMinutes;
-
-      progress.masteryLevel = masteryLevel ?? progress.masteryLevel;
-
-      progress.isWeakArea = isWeakArea ?? progress.isWeakArea;
-
-      progress.lastStudiedAt = new Date();
-
-      await progress.save();
-    } else {
-      progress = await Progress.create({
+    if (!progress) {
+      progress = new Progress({
         user: req.user.id,
-        classLevel,
-        subject,
-        chapter: chapter || null,
-        topic,
-        questionsAsked: questionsAsked || 0,
-        quizzesAttempted: quizzesAttempted || 0,
-        averageScore: averageScore || 0,
-        studyTimeMinutes: studyTimeMinutes || 0,
-        masteryLevel: masteryLevel || 'beginner',
-        isWeakArea: isWeakArea || false,
-        lastStudiedAt: new Date(),
+        classLevel: Number(classLevel),
+        subject: subject.trim(),
+        chapter: chapter.trim(),
+        topic: topic.trim(),
       });
     }
+
+    if (questionsAsked !== undefined) {
+      progress.questionsAsked = Number(questionsAsked);
+    }
+
+    if (quizzesAttempted !== undefined) {
+      progress.quizzesAttempted = Number(quizzesAttempted);
+    }
+
+    if (averageScore !== undefined) {
+      progress.averageScore = Number(averageScore);
+    }
+
+    if (studyTimeMinutes !== undefined) {
+      progress.studyTimeMinutes = Number(studyTimeMinutes);
+    }
+
+    if (masteryLevel !== undefined) {
+      const allowedLevels = [
+        'not_started',
+        'beginner',
+        'learning',
+        'good',
+        'mastered',
+      ];
+
+      if (!allowedLevels.includes(masteryLevel)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid mastery level',
+        });
+      }
+
+      progress.masteryLevel = masteryLevel;
+    }
+
+    if (isWeakArea !== undefined) {
+      progress.isWeakArea = Boolean(isWeakArea);
+    }
+
+    progress.lastStudiedAt = new Date();
+
+    await progress.save();
 
     res.status(200).json({
       success: true,
       message: 'Progress updated successfully',
-      data: progress,
+      progress,
     });
   } catch (error) {
-    console.error('Progress update error:', error.message);
+    console.error('Update progress error:', error);
 
     res.status(500).json({
       success: false,
@@ -83,20 +106,30 @@ router.post('/update', authMiddleware, async (req, res) => {
   }
 });
 
-// Get all progress
+
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const progress = await Progress.find({
+    const filter = {
       user: req.user.id,
-    }).sort({ lastStudiedAt: -1 });
+    };
 
-    res.json({
+    if (req.query.classLevel) {
+      filter.classLevel = Number(req.query.classLevel);
+    }
+
+    if (req.query.subject) {
+      filter.subject = req.query.subject;
+    }
+
+    const progress = await Progress.find(filter).sort({ lastStudiedAt: -1 });
+
+    res.status(200).json({
       success: true,
       count: progress.length,
-      data: progress,
+      progress,
     });
   } catch (error) {
-    console.error('Get progress error:', error.message);
+    console.error('Get progress error:', error);
 
     res.status(500).json({
       success: false,
@@ -105,21 +138,26 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-// Get weak areas
+/*
+  GET /api/progress/weak-areas
+  Get weak topics
+*/
 router.get('/weak-areas', authMiddleware, async (req, res) => {
   try {
     const weakAreas = await Progress.find({
       user: req.user.id,
       isWeakArea: true,
-    }).sort({ lastStudiedAt: -1 });
+    }).sort({
+      lastStudiedAt: -1,
+    });
 
-    res.json({
+    res.status(200).json({
       success: true,
       count: weakAreas.length,
-      data: weakAreas,
+      weakAreas,
     });
   } catch (error) {
-    console.error('Weak areas error:', error.message);
+    console.error('Get weak areas error:', error);
 
     res.status(500).json({
       success: false,
@@ -128,22 +166,27 @@ router.get('/weak-areas', authMiddleware, async (req, res) => {
   }
 });
 
-// Get progress by subject
+/*
+  GET /api/progress/subject/:subject
+  Get progress for a particular subject
+*/
 router.get('/subject/:subject', authMiddleware, async (req, res) => {
   try {
     const progress = await Progress.find({
       user: req.user.id,
       subject: req.params.subject,
-    }).sort({ lastStudiedAt: -1 });
+    }).sort({
+      lastStudiedAt: -1,
+    });
 
-    res.json({
+    res.status(200).json({
       success: true,
       subject: req.params.subject,
       count: progress.length,
-      data: progress,
+      progress,
     });
   } catch (error) {
-    console.error('Subject progress error:', error.message);
+    console.error('Get subject progress error:', error);
 
     res.status(500).json({
       success: false,
@@ -152,7 +195,10 @@ router.get('/subject/:subject', authMiddleware, async (req, res) => {
   }
 });
 
-// Overall progress summary
+/*
+  GET /api/progress/summary
+  Get overall progress summary
+*/
 router.get('/summary', authMiddleware, async (req, res) => {
   try {
     const progress = await Progress.find({
@@ -165,45 +211,55 @@ router.get('/summary', authMiddleware, async (req, res) => {
       (item) => item.masteryLevel === 'mastered',
     ).length;
 
-    const weakTopics = progress.filter((item) => item.isWeakArea).length;
+    const learningTopics = progress.filter(
+      (item) =>
+        item.masteryLevel === 'learning' || item.masteryLevel === 'beginner',
+    ).length;
 
-    const totalQuestions = progress.reduce(
-      (total, item) => total + (item.questionsAsked || 0),
+    const weakAreas = progress.filter((item) => item.isWeakArea).length;
+
+    const totalQuestionsAsked = progress.reduce(
+      (sum, item) => sum + (item.questionsAsked || 0),
       0,
     );
 
-    const totalQuizzes = progress.reduce(
-      (total, item) => total + (item.quizzesAttempted || 0),
+    const totalQuizzesAttempted = progress.reduce(
+      (sum, item) => sum + (item.quizzesAttempted || 0),
       0,
     );
 
-    const totalStudyTime = progress.reduce(
-      (total, item) => total + (item.studyTimeMinutes || 0),
+    const totalStudyTimeMinutes = progress.reduce(
+      (sum, item) => sum + (item.studyTimeMinutes || 0),
       0,
     );
 
     const averageScore =
-      totalTopics > 0
-        ? progress.reduce(
-            (total, item) => total + (item.averageScore || 0),
-            0,
-          ) / totalTopics
+      progress.length > 0
+        ? Number(
+            (
+              progress.reduce(
+                (sum, item) => sum + (item.averageScore || 0),
+                0,
+              ) / progress.length
+            ).toFixed(2),
+          )
         : 0;
 
-    res.json({
+    res.status(200).json({
       success: true,
-      data: {
+      summary: {
         totalTopics,
         masteredTopics,
-        weakTopics,
-        totalQuestions,
-        totalQuizzes,
-        totalStudyTimeMinutes: totalStudyTime,
-        averageScore: Number(averageScore.toFixed(2)),
+        learningTopics,
+        weakAreas,
+        totalQuestionsAsked,
+        totalQuizzesAttempted,
+        totalStudyTimeMinutes,
+        averageScore,
       },
     });
   } catch (error) {
-    console.error('Progress summary error:', error.message);
+    console.error('Progress summary error:', error);
 
     res.status(500).json({
       success: false,
