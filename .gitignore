@@ -1,0 +1,32 @@
+# IDE
+.idea/
+*.iml
+
+# Android and Gradle
+.gradle/
+**/build/
+local.properties
+/gradle-8.9/
+/gradle-8.9-bin.zip
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.*
+!**/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Logs and operating system files
+*.log
+.DS_Store
+Thumbs.db
