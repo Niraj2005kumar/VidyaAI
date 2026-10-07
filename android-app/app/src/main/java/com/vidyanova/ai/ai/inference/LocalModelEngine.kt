@@ -24,14 +24,10 @@ class LocalModelEngine(context: Context) {
 
         loadNativeLibrary()
         val modelFile = modelManager.prepareModel()
-        if (!modelFile.isFile || modelFile.length() == 0L) {
-            modelManager.deleteModel()
-            throw IOException(
-                "The bundled ${ModelConfig.MODEL_DISPLAY_NAME} model is missing or empty."
-            )
-        }
+        android.util.Log.i(TAG, "Loading local model from: ${modelFile.absolutePath} (${modelFile.length()} bytes)")
 
         if (!nativeLoadModel(modelFile.absolutePath)) {
+            android.util.Log.e(TAG, "nativeLoadModel returned false for: ${modelFile.absolutePath}")
             nativeReleaseModel()
             modelPath = null
             modelLoaded = false
@@ -40,6 +36,7 @@ class LocalModelEngine(context: Context) {
 
         modelPath = modelFile.absolutePath
         modelLoaded = true
+        android.util.Log.i(TAG, "Local model loaded successfully.")
         true
     }
 
@@ -92,6 +89,7 @@ class LocalModelEngine(context: Context) {
     private external fun nativeReleaseModel()
 
     companion object {
+        private const val TAG = "LocalModelEngine"
         private val nativeLock = Any()
         @Volatile
         private var nativeLibraryLoaded = false

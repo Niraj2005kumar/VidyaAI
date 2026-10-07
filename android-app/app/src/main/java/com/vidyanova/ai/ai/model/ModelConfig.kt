@@ -4,7 +4,6 @@ object ModelConfig {
 
     const val MODEL_FILE_NAME = "tutor-model.gguf"
 
-    const val MODEL_ASSET_PATH = "model/$MODEL_FILE_NAME"
 
     const val MODEL_DISPLAY_NAME = "ViyaAI Qwen 1.5B"
 

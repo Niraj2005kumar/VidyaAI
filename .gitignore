@@ -30,3 +30,12 @@ venv/
 *.log
 .DS_Store
 Thumbs.db
+.gradle/
+build/
+**/build/
+.cxx/
+**/.cxx/
+
+.idea/
+*.iml
+local.properties

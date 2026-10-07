@@ -1,22 +1,40 @@
-#!/bin/bash
+$ErrorActionPreference = "Stop"
 
-set -e
+$LLAMA_CPP = "../../android-app/llama.cpp"
+$MODEL_INPUT = "../models/finetuned/vidyanova-qwen-1.5b"
+$MODEL_MERGED = "../models/merged/vidyanova-qwen-1.5b"
+$MODEL_OUTPUT = "../models/quantized/tutor-model.gguf"
 
-MODEL_DIR="../models/finetuned/vidyanova-qwen-1.5b"
-MERGED_DIR="../models/finetuned/vidyanova-qwen-1.5b-merged"
-OUTPUT_DIR="../models/quantized"
+Write-Host "Step 1: Converting Hugging Face model to GGUF..."
 
-mkdir -p "$OUTPUT_DIR"
-
-python ../llama.cpp/convert_hf_to_gguf.py \
-    "$MERGED_DIR" \
-    --outfile "$OUTPUT_DIR/vidyanova-qwen-1.5b-f16.gguf" \
+python "$LLAMA_CPP/convert_hf_to_gguf.py" `
+    $MODEL_MERGED `
+    --outfile $MODEL_OUTPUT `
     --outtype f16
 
-../llama.cpp/build/bin/llama-quantize \
-    "$OUTPUT_DIR/vidyanova-qwen-1.5b-f16.gguf" \
-    "$OUTPUT_DIR/vidyanova-qwen-1.5b-q4_k_m.gguf" \
+Write-Host "Step 2: Quantizing GGUF to Q4_K_M..."
+
+$QUANTIZE_EXE = "$LLAMA_CPP/build/bin/llama-quantize.exe"
+
+if (!(Test-Path $QUANTIZE_EXE)) {
+    Write-Host "llama-quantize.exe not found."
+    Write-Host "Build llama.cpp first."
+    exit 1
+}
+
+$F16_MODEL = "../models/quantized/tutor-model-f16.gguf"
+
+if (Test-Path $F16_MODEL) {
+    Remove-Item $F16_MODEL
+}
+
+Rename-Item $MODEL_OUTPUT "tutor-model-f16.gguf"
+
+& $QUANTIZE_EXE `
+    "../models/quantized/tutor-model-f16.gguf" `
+    $MODEL_OUTPUT `
     Q4_K_M
 
-echo "Quantization completed."
-echo "Output: $OUTPUT_DIR/vidyanova-qwen-1.5b-q4_k_m.gguf"
+Write-Host ""
+Write-Host "Q4_K_M GGUF created successfully:"
+Write-Host $MODEL_OUTPUT

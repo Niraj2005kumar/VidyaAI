@@ -89,7 +89,10 @@ class TutorRepository(
             TutorResult(
                 success = false,
                 answer = when (error) {
-                    is IOException -> "ViyaAI's local model is not installed yet. Please add the Qwen GGUF model and try again."
+                    is IOException -> {
+                    Log.e(TAG, "Model IO error: ${error.message}", error)
+                    "Model error: ${error.message ?: "Unknown IO error"}"
+                        }
                     is UnsatisfiedLinkError -> "ViyaAI's on-device AI engine is unavailable in this app build."
                     else -> "ViyaAI couldn't generate an answer right now. Please try again."
                 },
