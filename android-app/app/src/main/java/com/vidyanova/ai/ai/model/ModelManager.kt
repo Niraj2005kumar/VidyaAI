@@ -82,6 +82,7 @@ class ModelManager(
         val modelFile = getModelFile()
 
         if (modelFile.exists()) {
+            
             modelFile.delete()
         }
     }
