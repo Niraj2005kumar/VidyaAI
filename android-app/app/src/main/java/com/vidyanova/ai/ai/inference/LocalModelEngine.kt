@@ -1,6 +1,7 @@
 package com.vidyanova.ai.ai.inference
 
 import android.content.Context
+import android.util.Log
 import com.vidyanova.ai.ai.model.ModelConfig
 import com.vidyanova.ai.ai.model.ModelManager
 import java.io.File
@@ -24,19 +25,21 @@ class LocalModelEngine(context: Context) {
 
         loadNativeLibrary()
         val modelFile = modelManager.prepareModel()
-        android.util.Log.i(TAG, "Loading local model from: ${modelFile.absolutePath} (${modelFile.length()} bytes)")
+        Log.i(TAG, "Loading local model from: ${modelFile.absolutePath} (${modelFile.length()} bytes)")
 
+        val startTime = System.currentTimeMillis()
         if (!nativeLoadModel(modelFile.absolutePath)) {
-            android.util.Log.e(TAG, "nativeLoadModel returned false for: ${modelFile.absolutePath}")
+            Log.e(TAG, "nativeLoadModel returned false for: ${modelFile.absolutePath}")
             nativeReleaseModel()
             modelPath = null
             modelLoaded = false
             return@synchronized false
         }
 
+        val loadTimeMs = System.currentTimeMillis() - startTime
         modelPath = modelFile.absolutePath
         modelLoaded = true
-        android.util.Log.i(TAG, "Local model loaded successfully.")
+        Log.i(TAG, "Local model loaded successfully in ${loadTimeMs}ms from ${modelFile.absolutePath}")
         true
     }
 
@@ -52,21 +55,24 @@ class LocalModelEngine(context: Context) {
 
         if (!modelLoaded && !loadModel()) {
             throw IllegalStateException(
-                "The local AI model could not be loaded. Check that the Qwen GGUF model is installed."
+                "The local AI model could not be loaded from ${modelManager.getModelFile().absolutePath}."
             )
         }
 
+        val startTime = System.currentTimeMillis()
         val response = nativeGenerate(
             prompt,
             ModelConfig.MAX_NEW_TOKENS,
             ModelConfig.TEMPERATURE
         )?.trim().orEmpty()
+        val generationTimeMs = System.currentTimeMillis() - startTime
 
         if (response.isEmpty()) {
             throw IllegalStateException("The local AI model returned an empty response.")
         }
 
-        ModelResponse(text = response)
+        Log.i(TAG, "Local model generation finished in ${generationTimeMs}ms")
+        ModelResponse(text = response, generationTimeMs = generationTimeMs)
     }
 
     @Synchronized

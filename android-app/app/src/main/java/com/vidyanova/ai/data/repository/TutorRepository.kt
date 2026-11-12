@@ -9,7 +9,6 @@ import com.vidyanova.ai.ai.instruction.TeachingMode
 import com.vidyanova.ai.ai.retrieval.CurriculumRetriever
 import com.vidyanova.ai.ai.retrieval.VectorStore
 import com.vidyanova.ai.ai.safety.CurriculumGuard
-import java.io.IOException
 
 data class TutorResult(
     val success: Boolean,
@@ -25,6 +24,9 @@ class TutorRepository(
 
     private val modelEngine = LocalModelEngine(context)
     private val curriculumRetriever = CurriculumRetriever(VectorStore())
+
+    // TEMPORARILY DISABLE FALLBACK RESPONSES FOR TESTING LOCAL QWEN GGUF MODEL
+    private val enableFallbackForTesting = false
 
     fun askTutor(
         question: String,
@@ -50,6 +52,8 @@ class TutorRepository(
             preferredMode = preferredMode,
             preferredLanguage = preferredLanguage
         )
+
+        var inferenceStartTimeMs: Long? = null
 
         return try {
             val curriculumContext = curriculumRetriever.buildContext(
@@ -79,25 +83,50 @@ class TutorRepository(
                 detectedStyle = style
             )
 
-            val generatedResponse = modelEngine.generate(prompt).text
+            inferenceStartTimeMs = System.currentTimeMillis()
+            val response = modelEngine.generate(prompt)
+
+            Log.i(
+                TAG,
+                "LOCAL_MODEL_SUCCESS | Source: LOCAL_QWEN_GGUF | " +
+                    "Generation duration: ${response.generationTimeMs}ms | " +
+                    "Response length: ${response.text.length}"
+            )
 
             TutorResult(
                 success = true,
-                answer = generatedResponse,
+                answer = response.text,
                 mode = style.mode.name,
                 language = style.language
             )
         } catch (throwable: Throwable) {
-            Log.e(TAG, "Local tutor inference exception: ${throwable.message}", throwable)
-
-            val fallbackAnswer = getEducationalFallback(question, classLevel, subject, preferredLanguage)
-
-            TutorResult(
-                success = true,
-                answer = fallbackAnswer,
-                mode = style.mode.name,
-                language = style.language
+            val generationDuration = inferenceStartTimeMs?.let {
+                "${System.currentTimeMillis() - it}ms"
+            } ?: "not_started"
+            Log.e(
+                TAG,
+                "LOCAL_MODEL_FAILED | Source: LOCAL_QWEN_GGUF | " +
+                    "Generation duration: $generationDuration | Cause: ${throwable.message}",
+                throwable
             )
+
+            if (enableFallbackForTesting) {
+                val fallbackAnswer = getEducationalFallback(question, classLevel, subject, preferredLanguage)
+                TutorResult(
+                    success = true,
+                    answer = fallbackAnswer,
+                    mode = style.mode.name,
+                    language = style.language
+                )
+            } else {
+                val errorDetails = throwable.message ?: "Native llama.cpp local inference failure"
+                TutorResult(
+                    success = false,
+                    answer = "LOCAL_MODEL_INFERENCE_FAILED: $errorDetails",
+                    mode = style.mode.name,
+                    language = style.language
+                )
+            }
         }
     }
 
@@ -107,6 +136,7 @@ class TutorRepository(
         subject: String,
         language: String?
     ): String {
+        Log.w(TAG, "FALLBACK_RESPONSE_USED | Question: $question | Class: $classLevel | Subject: $subject")
         val qLower = question.lowercase(java.util.Locale.ROOT)
 
         return when {

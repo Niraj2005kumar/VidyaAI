@@ -139,6 +139,8 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
         const llama_vocab* vocab = llama_model_get_vocab(g_model);
         const int32_t promptLength = static_cast<int32_t>(strlen(promptText));
 
+        LOGI("Starting tokenization for prompt length: %d", promptLength);
+
         int32_t nPrompt = llama_tokenize(
                 vocab,
                 promptText,
@@ -177,6 +179,7 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
         }
 
         tokens.resize(tokenCount);
+        LOGI("Prompt tokenized into %d tokens.", tokenCount);
 
         const int32_t contextSize = static_cast<int32_t>(llama_n_ctx(g_context));
         const int32_t batchLimit = static_cast<int32_t>(llama_n_batch(g_context));
@@ -216,6 +219,7 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
             }
             batch.n_tokens = currentBatch;
 
+            LOGI("Decoding prompt batch of %d tokens at pos %d...", currentBatch, pos);
             const int32_t decodeResult = llama_decode(g_context, batch);
             llama_batch_free(batch);
 
@@ -242,12 +246,15 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
         llama_sampler_chain_add(sampler, llama_sampler_init_dist(1234));
 
         std::string result;
+        LOGI("Starting generation loop up to %d new tokens...", outputLimit);
 
         for (int32_t i = 0; i < outputLimit; ++i) {
 
             llama_token token = llama_sampler_sample(sampler, g_context, -1);
+            llama_sampler_accept(sampler, token);
 
             if (llama_vocab_is_eog(vocab, token)) {
+                LOGI("End of generation token reached at step %d.", i);
                 break;
             }
 
@@ -314,6 +321,7 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
             return throwIllegalState(env, "The model generated an empty response.");
         }
 
+        LOGI("Native generate completed successfully (%zu chars generated).", result.size());
         return env->NewStringUTF(result.c_str());
 
     } catch (const std::exception& ex) {
