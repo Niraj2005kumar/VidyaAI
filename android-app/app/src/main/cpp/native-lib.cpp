@@ -70,7 +70,7 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeLoadModel(
         llama_backend_init();
 
         llama_model_params model_params = llama_model_default_params();
-        model_params.n_gpu_layers = 0; // Use CPU inference on Android
+        model_params.n_gpu_layers = 0; // CPU inference on Android
 
         g_model = llama_model_load_from_file(path, model_params);
 
@@ -196,6 +196,8 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
 
         llama_memory_clear(llama_get_memory(g_context), true);
 
+        // Process prompt tokens in batches using llama_batch_init
+        int32_t pos = 0;
         for (int32_t offset = 0; offset < tokenCount;) {
 
             const int32_t currentBatch = std::min(
@@ -203,12 +205,19 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
                     tokenCount - offset
             );
 
-            llama_batch batch = llama_batch_get_one(
-                    tokens.data() + offset,
-                    currentBatch
-            );
+            llama_batch batch = llama_batch_init(currentBatch, 0, 1);
+
+            for (int32_t i = 0; i < currentBatch; ++i) {
+                batch.token[i] = tokens[offset + i];
+                batch.pos[i] = pos + i;
+                batch.n_seq_id[i] = 1;
+                batch.seq_id[i][0] = 0;
+                batch.logits[i] = (i == currentBatch - 1);
+            }
+            batch.n_tokens = currentBatch;
 
             const int32_t decodeResult = llama_decode(g_context, batch);
+            llama_batch_free(batch);
 
             if (decodeResult != 0) {
                 return throwIllegalState(
@@ -218,6 +227,7 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
             }
 
             offset += currentBatch;
+            pos += currentBatch;
         }
 
         llama_sampler_chain_params samplerParams = llama_sampler_chain_default_params();
@@ -275,15 +285,26 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
             }
 
             if (i + 1 < outputLimit) {
-                llama_batch batch = llama_batch_get_one(&token, 1);
+                llama_batch batch = llama_batch_init(1, 0, 1);
+                batch.token[0] = token;
+                batch.pos[0] = pos;
+                batch.n_seq_id[0] = 1;
+                batch.seq_id[0][0] = 0;
+                batch.logits[0] = true;
+                batch.n_tokens = 1;
 
-                if (llama_decode(g_context, batch) != 0) {
+                const int32_t decodeResult = llama_decode(g_context, batch);
+                llama_batch_free(batch);
+
+                if (decodeResult != 0) {
                     llama_sampler_free(sampler);
                     return throwIllegalState(
                             env,
                             "Model decoding failed during generation."
                     );
                 }
+
+                pos++;
             }
         }
 
