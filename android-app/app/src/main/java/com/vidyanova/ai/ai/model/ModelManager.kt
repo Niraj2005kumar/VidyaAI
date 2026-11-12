@@ -10,18 +10,29 @@ class ModelManager(
 ) {
 
     fun getModelFile(): File {
-        val baseDir = context.filesDir
+        val fileName = ModelConfig.MODEL_FILE_NAME
 
-        val modelDir = File(baseDir, "model")
+        val candidateLocations = listOfNotNull(
+            File(context.filesDir, "model/$fileName"),
+            context.getExternalFilesDir(null)?.let { File(it, "model/$fileName") },
+            context.getExternalFilesDir(null)?.let { File(it, fileName) },
+            File("/sdcard/Android/data/${context.packageName}/files/model/$fileName"),
+            File("/sdcard/Android/data/${context.packageName}/files/$fileName"),
+            File("/sdcard/Download/$fileName"),
+            File("/sdcard/$fileName"),
+            File("/data/local/tmp/$fileName")
+        )
 
-        if (!modelDir.exists()) {
-            modelDir.mkdirs()
+        for (candidate in candidateLocations) {
+            if (candidate.exists() && candidate.isFile && candidate.length() > 0L) {
+                Log.i(TAG, "Found valid model file at: ${candidate.absolutePath} (${candidate.length()} bytes)")
+                return candidate
+            }
         }
 
-        return File(
-            modelDir,
-            ModelConfig.MODEL_FILE_NAME
-        )
+        val defaultFile = File(context.filesDir, "model/$fileName")
+        defaultFile.parentFile?.mkdirs()
+        return defaultFile
     }
 
     fun isModelAvailable(): Boolean {
@@ -64,7 +75,7 @@ class ModelManager(
 
         Log.d(
             TAG,
-            "Model found successfully: ${modelFile.absolutePath}"
+            "Model found successfully: ${modelFile.absolutePath} (${modelFile.length()} bytes)"
         )
 
         return modelFile
@@ -82,7 +93,6 @@ class ModelManager(
         val modelFile = getModelFile()
 
         if (modelFile.exists()) {
-            
             modelFile.delete()
         }
     }

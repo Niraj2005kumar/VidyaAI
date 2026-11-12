@@ -32,7 +32,7 @@ import com.vidyanova.ai.ui.screens.tutor.TutorScreen
 @Composable
 fun VidyaNovaNavHost(
     navController: NavHostController = rememberNavController(),
-    startDestination: String = "splash"
+    startDestination: String = "home"
 ) {
     var selectedClassLevel by remember { mutableIntStateOf(10) }
     var selectedSubject by remember { mutableStateOf("Mathematics") }
