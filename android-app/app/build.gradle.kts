@@ -7,13 +7,14 @@ plugins {
 android {
     namespace = "com.vidyanova.ai"
     compileSdk = 34
-
+    ndkVersion = "26.1.10909125"
     defaultConfig {
         applicationId = "com.vidyanova.ai"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        
 
         vectorDrawables {
             useSupportLibrary = true
@@ -40,6 +41,7 @@ android {
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
         }
     }
 

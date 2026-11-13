@@ -1,3 +1,4 @@
+
 package com.vidyanova.ai.ai.model
 
 import android.content.Context
@@ -9,73 +10,104 @@ class ModelManager(
     private val context: Context
 ) {
 
-    fun getModelFile(): File {
+    private fun getCandidateLocations(): List<File> {
         val fileName = ModelConfig.MODEL_FILE_NAME
 
-        val candidateLocations = listOfNotNull(
+        return listOfNotNull(
             File(context.filesDir, "model/$fileName"),
-            context.getExternalFilesDir(null)?.let { File(it, "model/$fileName") },
-            context.getExternalFilesDir(null)?.let { File(it, fileName) },
-            File("/sdcard/Android/data/${context.packageName}/files/model/$fileName"),
-            File("/sdcard/Android/data/${context.packageName}/files/$fileName"),
-            File("/sdcard/Download/$fileName"),
-            File("/sdcard/$fileName"),
-            File("/data/local/tmp/$fileName")
+            context.getExternalFilesDir(null)?.let {
+                File(it, "model/$fileName")
+            },
+            context.getExternalFilesDir(null)?.let {
+                File(it, fileName)
+            }
         )
+    }
 
-        for (candidate in candidateLocations) {
-            if (candidate.exists() && candidate.isFile && candidate.length() > 0L) {
-                Log.i(TAG, "Found valid model file at: ${candidate.absolutePath} (${candidate.length()} bytes)")
+    fun getModelFile(): File {
+        val candidates = getCandidateLocations()
+
+        for (candidate in candidates) {
+            if (isValidGguf(candidate)) {
+                Log.i(TAG, "Valid GGUF found: ${candidate.absolutePath}")
                 return candidate
             }
         }
 
-        val defaultFile = File(context.filesDir, "model/$fileName")
-        defaultFile.parentFile?.mkdirs()
+        val defaultFile = File(
+            context.filesDir,
+            "model/${ModelConfig.MODEL_FILE_NAME}"
+        )
+
+        if (!defaultFile.parentFile.exists()) {
+            defaultFile.parentFile?.mkdirs()
+        }
+
         return defaultFile
+    }
+
+    private fun isValidGguf(file: File): Boolean {
+        if (!file.exists() || !file.isFile || file.length() < 4L) {
+            return false
+        }
+
+        return try {
+            file.inputStream().use { input ->
+                val header = ByteArray(4)
+                if (input.read(header) != 4) return false
+
+                header.contentEquals(
+                    byteArrayOf(
+                        'G'.code.toByte(),
+                        'G'.code.toByte(),
+                        'U'.code.toByte(),
+                        'F'.code.toByte()
+                    )
+                )
+            }
+        } catch (e: IOException) {
+            Log.e(TAG, "GGUF validation failed", e)
+            false
+        }
     }
 
     fun isModelAvailable(): Boolean {
         val modelFile = getModelFile()
-
-        val exists = modelFile.exists()
-        val isFile = modelFile.isFile
-        val size = modelFile.length()
+        val valid = isValidGguf(modelFile)
 
         Log.d(
             TAG,
             "Model check: path=${modelFile.absolutePath}, " +
-                    "exists=$exists, isFile=$isFile, size=$size"
+                "valid=$valid, size=${modelFile.length()}"
         )
 
-        return exists && isFile && size > 0L
+        return valid
     }
 
     fun prepareModel(): File {
         val modelFile = getModelFile()
 
-        if (!isModelAvailable()) {
+        if (!isValidGguf(modelFile)) {
             throw IOException(
                 """
-                ${ModelConfig.MODEL_DISPLAY_NAME} model not found.
+                ${ModelConfig.MODEL_DISPLAY_NAME} model not found
+                or invalid.
 
-                Expected model location:
+                Expected location:
                 ${modelFile.absolutePath}
 
-                exists=${modelFile.exists()}
-                isFile=${modelFile.isFile}
-                size=${modelFile.length()}
-
-                Please copy:
+                Expected file:
                 ${ModelConfig.MODEL_FILE_NAME}
-                to the app model directory.
+
+                Please place a valid GGUF model in the app model directory.
                 """.trimIndent()
             )
         }
 
-        Log.d(
+        Log.i(
             TAG,
-            "Model found successfully: ${modelFile.absolutePath} (${modelFile.length()} bytes)"
+            "Model ready: ${modelFile.absolutePath}, " +
+                "size=${modelFile.length()} bytes"
         )
 
         return modelFile
@@ -89,11 +121,21 @@ class ModelManager(
         }
     }
 
-    fun deleteModel() {
+    /**
+     * Call this only after native inference has released the model.
+     */
+    fun deleteModel(): Boolean {
         val modelFile = getModelFile()
 
-        if (modelFile.exists()) {
-            modelFile.delete()
+        if (!modelFile.exists()) return true
+
+        return try {
+            val deleted = modelFile.delete()
+            Log.i(TAG, "Model deletion result: $deleted")
+            deleted
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Unable to delete model", e)
+            false
         }
     }
 

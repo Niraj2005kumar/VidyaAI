@@ -47,24 +47,26 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.vidyanova.ai.ui.components.OfflineIndicatorBadge
 import com.vidyanova.ai.ai.instruction.TeachingMode
 import com.vidyanova.ai.data.repository.ProgressRepository
 import com.vidyanova.ai.data.repository.TutorRepository
+import com.vidyanova.ai.ui.components.OfflineIndicatorBadge
 import com.vidyanova.ai.ui.theme.Primary
 import com.vidyanova.ai.ui.theme.Secondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.UUID
+
+private const val TAG = "TutorScreen"
 
 @Composable
 fun TutorScreen(
@@ -86,11 +88,11 @@ fun TutorScreen(
     val languages = listOf("English", "Hindi", "Hinglish")
 
     val quickPrompts = listOf(
+        "2+2",
         "bhai basic se samjha",
         "2 line mein batao",
         "step by step samjhao",
-        "example ke saath batao",
-        "exam ke liye answer do"
+        "example ke saath batao"
     )
 
     val messages = remember {
@@ -112,7 +114,14 @@ fun TutorScreen(
     }
 
     fun sendMessage(userText: String) {
-        if (isGenerating) return
+        val requestId = UUID.randomUUID().toString().subSequence(0, 8).toString()
+        android.util.Log.i(TAG, "CHAT_SEND_STARTED | RequestId: $requestId | UserInput: $userText")
+
+        if (isGenerating) {
+            android.util.Log.w(TAG, "CHAT_REQUEST_BLOCKED | RequestId: $requestId | Model is currently generating another response.")
+            return
+        }
+
         if (userText.isBlank()) {
             messages.add(
                 ChatMessage(
@@ -126,13 +135,12 @@ fun TutorScreen(
             return
         }
 
-        messages.add(
-            ChatMessage(
-                text = userText,
-                isFromUser = true,
-                timestamp = "Just now"
-            )
+        val userMessage = ChatMessage(
+            text = userText,
+            isFromUser = true,
+            timestamp = "Just now"
         )
+        messages.add(userMessage)
 
         val pendingMessage = ChatMessage(
             text = "ViyaAI is preparing an on-device answer…",
@@ -146,6 +154,9 @@ fun TutorScreen(
 
         coroutineScope.launch {
             try {
+                android.util.Log.i(TAG, "VIEWMODEL_REQUEST_STARTED | RequestId: $requestId")
+                android.util.Log.i(TAG, "REPOSITORY_REQUEST_STARTED | RequestId: $requestId")
+
                 val result = withContext(Dispatchers.IO) {
                     tutorRepository.askTutor(
                         question = userText,
@@ -158,26 +169,68 @@ fun TutorScreen(
                     )
                 }
 
-                val pendingIndex = messages.indexOfFirst { it.id == pendingMessage.id }
-                if (pendingIndex >= 0) {
-                    messages[pendingIndex] = pendingMessage.copy(
-                        text = result.answer,
-                        styleTag = result.mode.replace('_', ' ')
-                    )
+                android.util.Log.i(TAG, "JNI_RESULT_RECEIVED | RequestId: $requestId | Success: ${result.success} | Answer Length: ${result.answer.length}")
+
+                withContext(Dispatchers.Main) {
+                    val pendingIndex = messages.indexOfFirst { it.id == pendingMessage.id }
+                    if (pendingIndex >= 0) {
+                        messages[pendingIndex] = pendingMessage.copy(
+                            text = result.answer,
+                            styleTag = result.mode.replace('_', ' ')
+                        )
+                    } else {
+                        messages.add(
+                            ChatMessage(
+                                text = result.answer,
+                                isFromUser = false,
+                                styleTag = result.mode.replace('_', ' ')
+                            )
+                        )
+                    }
+                    val snippetLength = if (result.answer.length < 60) result.answer.length else 60
+                    val snippet = if (snippetLength > 0) result.answer.subSequence(0, snippetLength).toString() else ""
+                    android.util.Log.i(TAG, "VIEWMODEL_RESPONSE_UPDATED | RequestId: $requestId")
+                    android.util.Log.i(TAG, "CHAT_UI_RESPONSE_RENDERED | RequestId: $requestId | Answer: $snippet")
+                    listState.animateScrollToItem(messages.size - 1)
                 }
 
                 if (result.success) {
                     coroutineScope.launch(Dispatchers.IO) {
-                        ProgressRepository.recordTutorQuestion(
-                            classLevel = classLevel,
-                            subject = subject,
-                            chapter = chapter ?: "General",
-                            topic = topic ?: "Tutor questions"
-                        )
+                        try {
+                            ProgressRepository.recordTutorQuestion(
+                                classLevel = classLevel,
+                                subject = subject,
+                                chapter = chapter ?: "General",
+                                topic = topic ?: "Tutor questions"
+                            )
+                        } catch (e: Exception) {
+                            android.util.Log.e(TAG, "Error recording progress: ${e.message}")
+                        }
                     }
                 }
-
-                listState.animateScrollToItem(messages.size - 1)
+            } catch (throwable: Throwable) {
+                android.util.Log.e(TAG, "CHAT_REQUEST_FAILED | RequestId: $requestId | Cause: ${throwable.message}", throwable)
+                withContext(Dispatchers.Main) {
+                    val pendingIndex = messages.indexOfFirst { it.id == pendingMessage.id }
+                    val errorText = "LOCAL_MODEL_INFERENCE_FAILED: ${throwable.message ?: "Unknown error"}"
+                    if (pendingIndex >= 0) {
+                        messages[pendingIndex] = pendingMessage.copy(
+                            text = "⚠️ $errorText",
+                            styleTag = "Error"
+                        )
+                    } else {
+                        messages.add(
+                            ChatMessage(
+                                text = "⚠️ $errorText",
+                                isFromUser = false,
+                                styleTag = "Error"
+                            )
+                        )
+                    }
+                    android.util.Log.i(TAG, "VIEWMODEL_RESPONSE_UPDATED | RequestId: $requestId | Error")
+                    android.util.Log.i(TAG, "CHAT_UI_RESPONSE_RENDERED | RequestId: $requestId | Error rendered")
+                    listState.animateScrollToItem(messages.size - 1)
+                }
             } finally {
                 isGenerating = false
             }
@@ -246,7 +299,7 @@ fun TutorScreen(
                     OfflineIndicatorBadge()
                 }
 
-                // Language & Style Selector Row
+                // Language Switcher Row
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -254,7 +307,6 @@ fun TutorScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Language Switcher
                     languages.forEach { lang ->
                         val isLangSelected = lang == selectedLanguage
                         Box(
@@ -314,12 +366,12 @@ fun TutorScreen(
             contentPadding = PaddingValues(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            items(messages) { msg ->
+            items(messages, key = { it.id }) { msg ->
                 ChatBubble(message = msg)
             }
         }
 
-        // Quick Natural Prompts Row
+        // Quick Prompts Row
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -400,7 +452,7 @@ fun TutorScreen(
 
                 // Voice Placeholder Button
                 IconButton(
-                    onClick = { /* Voice input placeholder */ },
+                    onClick = { },
                     modifier = Modifier
                         .size(42.dp)
                         .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
