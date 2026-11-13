@@ -17,6 +17,8 @@ object ModelConfig {
 
     const val TOP_P = 0.9f
 
+    
+
     const val MAX_NEW_TOKENS = 64
 
     const val QUANTIZATION = "Q4_K_M"
