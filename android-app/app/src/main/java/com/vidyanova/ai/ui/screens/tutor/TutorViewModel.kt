@@ -1,3 +1,4 @@
+
 package com.vidyanova.ai.ui.screens.tutor
 
 import android.app.Application
@@ -7,15 +8,19 @@ import androidx.lifecycle.viewModelScope
 import com.vidyanova.ai.ai.instruction.TeachingMode
 import com.vidyanova.ai.data.repository.ProgressRepository
 import com.vidyanova.ai.data.repository.TutorRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import java.util.UUID
 
-enum class UiStatus { IDLE, LOADING, SUCCESS, ERROR }
+enum class UiStatus {
+    IDLE, LOADING, SUCCESS, ERROR
+}
 
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
@@ -24,9 +29,12 @@ data class ChatUiState(
     val errorMessage: String? = null
 )
 
-class TutorViewModel(application: Application) : AndroidViewModel(application) {
+class TutorViewModel(application: Application) :
+    AndroidViewModel(application) {
 
     private val tutorRepository = TutorRepository(application)
+
+    private val generationMutex = Mutex()
 
     private val _uiState = MutableStateFlow(
         ChatUiState(
@@ -40,7 +48,8 @@ class TutorViewModel(application: Application) : AndroidViewModel(application) {
             )
         )
     )
-    val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    val uiState = _uiState.asStateFlow()
 
     fun sendMessage(
         userText: String,
@@ -51,24 +60,14 @@ class TutorViewModel(application: Application) : AndroidViewModel(application) {
         preferredMode: TeachingMode? = null,
         preferredLanguage: String? = null
     ) {
-        val requestId = UUID.randomUUID().toString().subSequence(0, 8).toString()
-        Log.i(TAG, "CHAT_SEND_STARTED | RequestId: $requestId | Question: $userText")
+        if (userText.isBlank()) return
 
-        if (_uiState.value.isGenerating) {
-            Log.w(TAG, "CHAT_REQUEST_BLOCKED | RequestId: $requestId | Model is currently generating another response.")
+        if (!generationMutex.tryLock()) {
+            Log.w(TAG, "Another generation is already running.")
             return
         }
 
-        if (userText.isBlank()) {
-            val emptyMsg = ChatMessage(
-                text = "Please apna question likho.",
-                isFromUser = false
-            )
-            _uiState.value = _uiState.value.copy(
-                messages = _uiState.value.messages + emptyMsg
-            )
-            return
-        }
+        val requestId = UUID.randomUUID().toString().take(8)
 
         val userMsg = ChatMessage(
             text = userText,
@@ -82,118 +81,152 @@ class TutorViewModel(application: Application) : AndroidViewModel(application) {
             styleTag = preferredMode?.name ?: "Step-by-Step"
         )
 
-        val updatedMessages = _uiState.value.messages + userMsg + pendingMsg
+        _uiState.update { current ->
+            current.copy(
+                messages = current.messages + userMsg + pendingMsg,
+                isGenerating = true,
+                status = UiStatus.LOADING,
+                errorMessage = null
+            )
+        }
 
-        _uiState.value = _uiState.value.copy(
-            messages = updatedMessages,
-            isGenerating = true,
-            status = UiStatus.LOADING,
-            errorMessage = null
-        )
-
-        Log.i(TAG, "VIEWMODEL_REQUEST_STARTED | RequestId: $requestId")
-
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             val startTime = System.currentTimeMillis()
+
             try {
-                Log.i(TAG, "REPOSITORY_REQUEST_STARTED | RequestId: $requestId")
-                val result = tutorRepository.askTutor(
-                    question = userText,
-                    classLevel = classLevel,
-                    subject = subject,
-                    chapter = chapter,
-                    topic = topic,
-                    preferredMode = preferredMode,
-                    preferredLanguage = preferredLanguage
-                )
-                val durationMs = System.currentTimeMillis() - startTime
+                Log.i(TAG, "CHAT_STARTED | RequestId: $requestId")
 
-                withContext(Dispatchers.Main) {
-                    val currentList = _uiState.value.messages.toMutableList()
-                    val pendingIndex = currentList.indexOfFirst { it.id == pendingMsg.id }
-
-                    if (result.success) {
-                        Log.i(TAG, "LOCAL_MODEL_GENERATION_COMPLETED | RequestId: $requestId | Duration: ${durationMs}ms")
-                        if (pendingIndex >= 0) {
-                            currentList[pendingIndex] = pendingMsg.copy(
-                                text = result.answer,
-                                styleTag = result.mode.replace('_', ' ')
-                            )
-                        }
-                        _uiState.value = _uiState.value.copy(
-                            messages = currentList,
-                            isGenerating = false,
-                            status = UiStatus.SUCCESS,
-                            errorMessage = null
-                        )
-                        Log.i(TAG, "VIEWMODEL_RESPONSE_UPDATED | RequestId: $requestId | Success | Answer Length: ${result.answer.length}")
-                        Log.i(TAG, "CHAT_UI_RESPONSE_RENDERED | RequestId: $requestId")
-                    } else {
-                        Log.e(TAG, "LOCAL_MODEL_GENERATION_FAILED | RequestId: $requestId | Error: ${result.answer}")
-                        if (pendingIndex >= 0) {
-                            currentList[pendingIndex] = pendingMsg.copy(
-                                text = "⚠️ ${result.answer}",
-                                styleTag = "Error"
-                            )
-                        }
-                        _uiState.value = _uiState.value.copy(
-                            messages = currentList,
-                            isGenerating = false,
-                            status = UiStatus.ERROR,
-                            errorMessage = result.answer
-                        )
-                        Log.i(TAG, "VIEWMODEL_RESPONSE_UPDATED | RequestId: $requestId | Error")
-                        Log.i(TAG, "CHAT_UI_RESPONSE_RENDERED | RequestId: $requestId")
-                    }
+                val result = withContext(Dispatchers.IO) {
+                    tutorRepository.askTutor(
+                        question = userText,
+                        classLevel = classLevel,
+                        subject = subject,
+                        chapter = chapter,
+                        topic = topic,
+                        preferredMode = preferredMode,
+                        preferredLanguage = preferredLanguage
+                    )
                 }
+
+                val duration = System.currentTimeMillis() - startTime
 
                 if (result.success) {
+                    updatePendingMessage(
+                        pendingMsg = pendingMsg,
+                        response = result.answer,
+                        styleTag = result.mode.replace('_', ' '),
+                        status = UiStatus.SUCCESS
+                    )
+
+                    Log.i(
+                        TAG,
+                        "LOCAL_MODEL_SUCCESS | RequestId: $requestId | Duration: ${duration}ms"
+                    )
+
                     try {
-                        ProgressRepository.recordTutorQuestion(
-                            classLevel = classLevel,
-                            subject = subject,
-                            chapter = chapter ?: "General",
-                            topic = topic ?: "Tutor questions"
-                        )
+                        withContext(Dispatchers.IO) {
+                            ProgressRepository.recordTutorQuestion(
+                                classLevel = classLevel,
+                                subject = subject,
+                                chapter = chapter ?: "General",
+                                topic = topic ?: "Tutor questions"
+                            )
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error updating progress history: ${e.message}")
+                        Log.e(TAG, "Progress history update failed", e)
                     }
+
+                } else {
+                    updatePendingMessage(
+                        pendingMsg = pendingMsg,
+                        response = "⚠️ ${result.answer}",
+                        styleTag = "Error",
+                        status = UiStatus.ERROR,
+                        error = result.answer
+                    )
+
+                    Log.e(TAG, "LOCAL_MODEL_FAILED: ${result.answer}")
                 }
 
-            } catch (throwable: Throwable) {
-                val durationMs = System.currentTimeMillis() - startTime
-                Log.e(TAG, "CHAT_REQUEST_FAILED | RequestId: $requestId | Duration: ${durationMs}ms | Cause: ${throwable.message}", throwable)
+            } catch (e: CancellationException) {
+                Log.w(TAG, "CHAT_CANCELLED | RequestId: $requestId")
+                throw e
 
-                withContext(Dispatchers.Main) {
-                    val currentList = _uiState.value.messages.toMutableList()
-                    val pendingIndex = currentList.indexOfFirst { it.id == pendingMsg.id }
-                    val errorText = "LOCAL_MODEL_INFERENCE_FAILED: ${throwable.message ?: "Unknown error"}"
+            } catch (e: Exception) {
+                val errorText =
+                    "LOCAL_MODEL_INFERENCE_FAILED: ${e.message ?: "Unknown error"}"
 
-                    if (pendingIndex >= 0) {
-                        currentList[pendingIndex] = pendingMsg.copy(
-                            text = "⚠️ $errorText",
-                            styleTag = "Error"
-                        )
-                    }
+                Log.e(TAG, "CHAT_REQUEST_FAILED | RequestId: $requestId", e)
 
-                    _uiState.value = _uiState.value.copy(
-                        messages = currentList,
+                updatePendingMessage(
+                    pendingMsg = pendingMsg,
+                    response = "⚠️ $errorText",
+                    styleTag = "Error",
+                    status = UiStatus.ERROR,
+                    error = errorText
+                )
+
+            } finally {
+                generationMutex.unlock()
+
+                _uiState.update { current ->
+                    current.copy(
                         isGenerating = false,
-                        status = UiStatus.ERROR,
-                        errorMessage = errorText
+                        status = if (current.status == UiStatus.LOADING) {
+                            UiStatus.IDLE
+                        } else {
+                            current.status
+                        }
                     )
-                    Log.i(TAG, "CHAT_UI_RESPONSE_RENDERED | RequestId: $requestId")
+                }
+
+                Log.i(TAG, "GENERATION_FINISHED | RequestId: $requestId")
+            }
+        }
+    }
+
+    private fun updatePendingMessage(
+        pendingMsg: ChatMessage,
+        response: String,
+        styleTag: String,
+        status: UiStatus,
+        error: String? = null
+    ) {
+        _uiState.update { current ->
+            val updatedMessages = current.messages.map { message ->
+                if (message.id == pendingMsg.id) {
+                    message.copy(
+                        text = response,
+                        styleTag = styleTag
+                    )
+                } else {
+                    message
                 }
             }
+
+            current.copy(
+                messages = updatedMessages,
+                status = status,
+                errorMessage = error
+            )
         }
     }
 
     override fun onCleared() {
         super.onCleared()
-        try {
-            tutorRepository.releaseModel()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error releasing model on ViewModel cleared", e)
+
+        Thread({
+            try {
+                tutorRepository.releaseModel()
+                Log.i(TAG, "Local model released")
+            } catch (e: Exception) {
+                Log.e(TAG, "Model release failed", e)
+            }
+        }, "ViyaAI-ModelRelease").apply {
+            isDaemon = true
+            start()
         }
     }
 

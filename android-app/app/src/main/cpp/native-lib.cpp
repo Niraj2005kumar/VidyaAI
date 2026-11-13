@@ -10,6 +10,7 @@
 #include <vector>
 #include <memory>
 #include <exception>
+#include <chrono>
 
 #include "llama.h"
 
@@ -238,14 +239,13 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeLoadModel(
             return JNI_FALSE;
         }
 
-        const unsigned int hardware_threads = std::thread::hardware_concurrency();
-        const int32_t thread_count = static_cast<int32_t>(
-            std::max(1u, std::min(4u, hardware_threads == 0 ? 2u : hardware_threads))
-        );
+        // Keep these values aligned with ModelConfig.kt during this benchmark.
+        // Start conservatively on emulator/low-memory Android devices.
+        const int32_t thread_count = 2;
 
         llama_context_params context_params = llama_context_default_params();
-        context_params.n_ctx = 2048;
-        context_params.n_batch = 256;
+        context_params.n_ctx = 1024;
+        context_params.n_batch = 64;
         context_params.n_threads = thread_count;
         context_params.n_threads_batch = thread_count;
 
@@ -301,6 +301,7 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
             return throwIllegalState(env, "The local AI model is not loaded.");
         }
 
+        const auto total_start = std::chrono::steady_clock::now();
         const llama_vocab * vocab = llama_model_get_vocab(g_model);
         const int32_t prompt_bytes = static_cast<int32_t>(prompt_utf8.size());
 
@@ -326,6 +327,7 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
             return throwIllegalState(env, "Prompt tokenization failed.");
         }
         tokens.resize(static_cast<size_t>(token_count));
+        const auto tokenized_at = std::chrono::steady_clock::now();
 
         const int32_t context_size = static_cast<int32_t>(llama_n_ctx(g_context));
         const int32_t batch_limit = static_cast<int32_t>(llama_n_batch(g_context));
@@ -376,6 +378,8 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
             position += current_batch;
         }
 
+        const auto prompt_decoded_at = std::chrono::steady_clock::now();
+
         llama_sampler_chain_params sampler_params = llama_sampler_chain_default_params();
         std::unique_ptr<llama_sampler, SamplerDeleter> sampler(
             llama_sampler_chain_init(sampler_params)
@@ -392,6 +396,16 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
         std::string output;
         output.reserve(static_cast<size_t>(output_limit) * 4);
 
+        // Allocate one decode batch and reuse it for every generated token.
+        BatchGuard next_batch_guard(1);
+        llama_batch & next_batch = next_batch_guard.batch;
+        if (next_batch.token == nullptr || next_batch.pos == nullptr ||
+            next_batch.n_seq_id == nullptr || next_batch.seq_id == nullptr ||
+            next_batch.logits == nullptr) {
+            return throwIllegalState(env, "Unable to allocate generation batch.");
+        }
+
+        int32_t generated_tokens = 0;
         for (int32_t i = 0; i < output_limit; ++i) {
             const llama_token token = llama_sampler_sample(sampler.get(), g_context, -1);
             llama_sampler_accept(sampler.get(), token);
@@ -399,6 +413,7 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
             if (llama_vocab_is_eog(vocab, token)) {
                 break;
             }
+            ++generated_tokens;
 
             char piece_buffer[4096];
             int32_t piece_size = llama_token_to_piece(
@@ -420,15 +435,6 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
             }
 
             if (i + 1 < output_limit) {
-                BatchGuard next_batch_guard(1);
-                llama_batch & next_batch = next_batch_guard.batch;
-
-                if (next_batch.token == nullptr || next_batch.pos == nullptr ||
-                    next_batch.n_seq_id == nullptr || next_batch.seq_id == nullptr ||
-                    next_batch.logits == nullptr) {
-                    return throwIllegalState(env, "Unable to allocate generation batch.");
-                }
-
                 next_batch.token[0] = token;
                 next_batch.pos[0] = position;
                 next_batch.n_seq_id[0] = 1;
@@ -448,7 +454,25 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerate(
             return throwIllegalState(env, "The model generated an empty response.");
         }
 
-        LOGI("Generated %zu UTF-8 bytes", output.size());
+        const auto finished_at = std::chrono::steady_clock::now();
+        const auto tokenize_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            tokenized_at - total_start).count();
+        const auto prompt_decode_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            prompt_decoded_at - tokenized_at).count();
+        const auto generation_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            finished_at - prompt_decoded_at).count();
+        const double tokens_per_second = generation_ms > 0
+            ? (generated_tokens * 1000.0 / generation_ms) : 0.0;
+
+        LOGI("Prompt tokens: %d | Generated tokens: %d", token_count, generated_tokens);
+        LOGI("Timing ms: tokenize=%lld prompt_decode=%lld generation=%lld total=%lld",
+             static_cast<long long>(tokenize_ms),
+             static_cast<long long>(prompt_decode_ms),
+             static_cast<long long>(generation_ms),
+             static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                 finished_at - total_start).count()));
+        LOGI("Generation speed: %.3f tokens/sec | Output bytes: %zu",
+             tokens_per_second, output.size());
         return utf8ToJstring(env, output);
 
     } catch (const std::exception & ex) {

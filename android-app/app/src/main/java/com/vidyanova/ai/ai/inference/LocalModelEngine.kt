@@ -1,11 +1,10 @@
+
 package com.vidyanova.ai.ai.inference
 
 import android.content.Context
 import android.util.Log
 import com.vidyanova.ai.ai.model.ModelConfig
 import com.vidyanova.ai.ai.model.ModelManager
-import java.io.File
-import java.io.IOException
 
 data class ModelResponse(
     val text: String,
@@ -15,76 +14,124 @@ data class ModelResponse(
 
 class LocalModelEngine(context: Context) {
 
-    private val modelManager = ModelManager(context.applicationContext)
-    private var modelLoaded = false
-    private var modelPath: String? = null
+    private val modelManager =
+        ModelManager(context.applicationContext)
 
-    @Synchronized
     fun loadModel(): Boolean = synchronized(nativeLock) {
-        if (modelLoaded) return@synchronized true
-
-        loadNativeLibrary()
-        val modelFile = modelManager.prepareModel()
-        Log.i(TAG, "Loading local model from: ${modelFile.absolutePath} (${modelFile.length()} bytes)")
-
-        val startTime = System.currentTimeMillis()
-        if (!nativeLoadModel(modelFile.absolutePath)) {
-            Log.e(TAG, "nativeLoadModel returned false for: ${modelFile.absolutePath}")
-            nativeReleaseModel()
-            modelPath = null
-            modelLoaded = false
-            return@synchronized false
+        if (nativeModelLoaded) {
+            return@synchronized true
         }
 
-        val loadTimeMs = System.currentTimeMillis() - startTime
-        modelPath = modelFile.absolutePath
-        modelLoaded = true
-        Log.i(TAG, "Local model loaded successfully in ${loadTimeMs}ms from ${modelFile.absolutePath}")
-        true
+        try {
+            loadNativeLibrary()
+
+            val modelFile = modelManager.prepareModel()
+
+            require(modelFile.exists() && modelFile.isFile) {
+                "Model file does not exist: ${modelFile.absolutePath}"
+            }
+
+            Log.i(
+                TAG,
+                "Loading model: ${modelFile.absolutePath}, size=${modelFile.length()}"
+            )
+
+            val startTime = System.currentTimeMillis()
+
+            val loaded = nativeLoadModel(modelFile.absolutePath)
+
+            if (!loaded) {
+                Log.e(TAG, "Native model loading failed")
+                nativeReleaseModel()
+                nativeModelLoaded = false
+                nativeModelPath = null
+                return@synchronized false
+            }
+
+            nativeModelPath = modelFile.absolutePath
+            nativeModelLoaded = true
+
+            Log.i(
+                TAG,
+                "Model loaded successfully in ${System.currentTimeMillis() - startTime}ms"
+            )
+
+            true
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Model loading error", e)
+            nativeModelLoaded = false
+            nativeModelPath = null
+            false
+        }
     }
 
-    @Synchronized
-    fun isModelLoaded(): Boolean = modelLoaded
+    fun isModelLoaded(): Boolean =
+        synchronized(nativeLock) {
+            nativeModelLoaded
+        }
 
-    @Synchronized
-    fun getModelPath(): String? = modelPath
+    fun getModelPath(): String? =
+        synchronized(nativeLock) {
+            nativeModelPath
+        }
 
-    @Synchronized
-    fun generate(prompt: String): ModelResponse = synchronized(nativeLock) {
-        require(prompt.isNotBlank()) { "Prompt cannot be empty." }
+    fun generate(prompt: String): ModelResponse =
+        synchronized(nativeLock) {
 
-        if (!modelLoaded && !loadModel()) {
-            throw IllegalStateException(
-                "The local AI model could not be loaded from ${modelManager.getModelFile().absolutePath}."
+            require(prompt.isNotBlank()) {
+                "Prompt cannot be empty."
+            }
+
+            if (!nativeModelLoaded && !loadModel()) {
+                throw IllegalStateException(
+                    "Local AI model could not be loaded."
+                )
+            }
+
+            val startTime = System.currentTimeMillis()
+
+            val response = nativeGenerate(
+                prompt,
+                ModelConfig.MAX_NEW_TOKENS,
+                ModelConfig.TEMPERATURE
+            )?.trim().orEmpty()
+
+            val generationTimeMs =
+                System.currentTimeMillis() - startTime
+
+            if (response.isEmpty()) {
+                throw IllegalStateException(
+                    "The local AI model returned an empty response."
+                )
+            }
+
+            Log.i(
+                TAG,
+                "Generation finished in ${generationTimeMs}ms"
+            )
+
+            ModelResponse(
+                text = response,
+                generationTimeMs = generationTimeMs
             )
         }
 
-        val startTime = System.currentTimeMillis()
-        val response = nativeGenerate(
-            prompt,
-            ModelConfig.MAX_NEW_TOKENS,
-            ModelConfig.TEMPERATURE
-        )?.trim().orEmpty()
-        val generationTimeMs = System.currentTimeMillis() - startTime
+    fun unloadModel() {
+        synchronized(nativeLock) {
+            if (nativeModelLoaded) {
+                Log.i(TAG, "Releasing shared native model")
+                nativeReleaseModel()
+            }
 
-        if (response.isEmpty()) {
-            throw IllegalStateException("The local AI model returned an empty response.")
+            nativeModelLoaded = false
+            nativeModelPath = null
         }
-
-        Log.i(TAG, "Local model generation finished in ${generationTimeMs}ms")
-        ModelResponse(text = response, generationTimeMs = generationTimeMs)
     }
 
-    @Synchronized
-    fun unloadModel() = synchronized(nativeLock) {
-        if (modelLoaded) {
-            nativeReleaseModel()
-        }
-        modelLoaded = false
-        modelPath = null
-    }
-
-    private external fun nativeLoadModel(modelPath: String): Boolean
+    private external fun nativeLoadModel(
+        modelPath: String
+    ): Boolean
 
     private external fun nativeGenerate(
         prompt: String,
@@ -96,7 +143,12 @@ class LocalModelEngine(context: Context) {
 
     companion object {
         private const val TAG = "LocalModelEngine"
+
         private val nativeLock = Any()
+
+        private var nativeModelLoaded = false
+        private var nativeModelPath: String? = null
+
         @Volatile
         private var nativeLibraryLoaded = false
 
@@ -104,6 +156,8 @@ class LocalModelEngine(context: Context) {
             if (!nativeLibraryLoaded) {
                 System.loadLibrary("vidyanova_native")
                 nativeLibraryLoaded = true
+
+                Log.i(TAG, "Native library loaded successfully")
             }
         }
     }
