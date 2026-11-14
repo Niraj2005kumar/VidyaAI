@@ -34,13 +34,14 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +56,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vidyanova.ai.VidyaAiApplication
 import com.vidyanova.ai.ai.instruction.TeachingMode
 import com.vidyanova.ai.data.repository.ProgressRepository
 import com.vidyanova.ai.data.repository.TutorRepository
@@ -62,6 +64,7 @@ import com.vidyanova.ai.ui.components.OfflineIndicatorBadge
 import com.vidyanova.ai.ui.theme.Primary
 import com.vidyanova.ai.ui.theme.Secondary
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -79,6 +82,10 @@ fun TutorScreen(
     onOpenScan: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val app = context.applicationContext as? VidyaAiApplication
+    val setupProgress by (app?.setupProgress ?: MutableStateFlow(100)).collectAsState()
+    val isSetupComplete by (app?.isSetupComplete ?: MutableStateFlow(true)).collectAsState()
+
     val tutorRepository = remember(context) { TutorRepository(context) }
     var inputText by remember { mutableStateOf(initialPrompt ?: "") }
     var selectedLanguage by remember { mutableStateOf("Hinglish") }
@@ -109,14 +116,12 @@ fun TutorScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
-    // Note: Model is managed at Application level so we do NOT release it when leaving TutorScreen
-
     fun sendMessage(userText: String) {
         val requestId = UUID.randomUUID().toString().subSequence(0, 8).toString()
         android.util.Log.i(TAG, "CHAT_SEND_STARTED | RequestId: $requestId | UserInput: $userText")
 
-        if (isGenerating) {
-            android.util.Log.w(TAG, "CHAT_REQUEST_BLOCKED | RequestId: $requestId | Model is currently generating another response.")
+        if (isGenerating || !isSetupComplete) {
+            android.util.Log.w(TAG, "CHAT_REQUEST_BLOCKED | RequestId: $requestId | Setup in progress or currently generating.")
             return
         }
 
@@ -255,6 +260,28 @@ fun TutorScreen(
             .navigationBarsPadding()
             .imePadding()
     ) {
+        // First Run Setup Banner
+        if (!isSetupComplete) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "Pehli baar setup ho raha hai... ($setupProgress%)",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    LinearProgressIndicator(
+                        progress = { setupProgress / 100f },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+
         // Tutor Header
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -391,7 +418,7 @@ fun TutorScreen(
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
                         .background(MaterialTheme.colorScheme.surface)
-                        .clickable { sendMessage(prompt) }
+                        .clickable { if (isSetupComplete) sendMessage(prompt) }
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
@@ -439,7 +466,7 @@ fun TutorScreen(
                     onValueChange = { inputText = it },
                     placeholder = {
                         Text(
-                            text = "Ask ViyaAI anything...",
+                            text = if (isSetupComplete) "Ask ViyaAI anything..." else "Pehli baar setup ho raha hai...",
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -454,7 +481,7 @@ fun TutorScreen(
                         focusedBorderColor = Primary,
                         unfocusedBorderColor = Color.Transparent
                     ),
-                    enabled = !isGenerating,
+                    enabled = !isGenerating && isSetupComplete,
                     maxLines = 3
                 )
 
@@ -480,7 +507,7 @@ fun TutorScreen(
                 // Send Button
                 IconButton(
                     onClick = { sendMessage(inputText) },
-                    enabled = !isGenerating,
+                    enabled = !isGenerating && isSetupComplete,
                     modifier = Modifier
                         .size(42.dp)
                         .background(Primary, CircleShape)

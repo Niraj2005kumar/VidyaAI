@@ -26,9 +26,9 @@ set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
 
-# arm64 phone CPU dotprod acceleration
+# Safe baseline armv8-a CPU architecture for universal budget phone compatibility (prevents SIGILL on Cortex-A53/A55)
 if (ANDROID_ABI STREQUAL "arm64-v8a")
-    set(GGML_CPU_ARM_ARCH "armv8.2-a+dotprod" CACHE STRING "" FORCE)
+    set(GGML_CPU_ARM_ARCH "armv8-a" CACHE STRING "" FORCE)
 endif()
 
 set(LLAMA_CPP_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../../llama.cpp")

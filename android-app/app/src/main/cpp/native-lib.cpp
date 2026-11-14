@@ -18,7 +18,6 @@
 
 static llama_model* g_model = nullptr;
 static llama_context* g_context = nullptr;
-static std::vector<llama_token> g_prev_tokens;
 
 static void custom_ggml_abort_callback(const char* error_message) {
     LOGE("GGML ABORT INTERCEPTED: %s", error_message ? error_message : "Unknown error");
@@ -32,6 +31,50 @@ static jstring throwIllegalState(JNIEnv* env, const char* message) {
         env->ThrowNew(exceptionClass, message);
     }
     return nullptr;
+}
+
+// Safely extract complete valid UTF-8 bytes from accumulator string
+static size_t get_valid_utf8_length(const std::string& str) {
+    size_t valid_len = 0;
+    size_t i = 0;
+    size_t len = str.length();
+
+    while (i < len) {
+        unsigned char c = static_cast<unsigned char>(str[i]);
+        size_t seq_len = 0;
+
+        if ((c & 0x80) == 0) {
+            seq_len = 1;
+        } else if ((c & 0xE0) == 0xC0) {
+            seq_len = 2;
+        } else if ((c & 0xF0) == 0xE0) {
+            seq_len = 3;
+        } else if ((c & 0xF8) == 0xF0) {
+            seq_len = 4;
+        } else {
+            i++;
+            continue;
+        }
+
+        if (i + seq_len <= len) {
+            bool valid = true;
+            for (size_t k = 1; k < seq_len; ++k) {
+                if ((static_cast<unsigned char>(str[i + k]) & 0xC0) != 0x80) {
+                    valid = false;
+                    break;
+                }
+            }
+            if (valid) {
+                i += seq_len;
+                valid_len = i;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    return valid_len;
 }
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*, void*) {
@@ -73,7 +116,6 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeLoadModel(
             g_model = nullptr;
         }
 
-        g_prev_tokens.clear();
         llama_backend_init();
 
         llama_model_params model_params = llama_model_default_params();
@@ -218,30 +260,13 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerateStream(
                 contextSize - tokenCount
         );
 
-        // Find matching prefix in KV cache to avoid re-decoding system prompt
-        size_t matching_prefix = 0;
-        while (matching_prefix < g_prev_tokens.size() &&
-               matching_prefix < tokens.size() &&
-               g_prev_tokens[matching_prefix] == tokens[matching_prefix]) {
-            matching_prefix++;
-        }
-
-        LOGI("KV Cache Retention: prev_tokens=%zu, new_tokens=%d, matching_prefix=%zu",
-             g_prev_tokens.size(), tokenCount, matching_prefix);
-
-        if (matching_prefix > 0) {
-            llama_memory_seq_rm(llama_get_memory(g_context), -1, static_cast<llama_pos>(matching_prefix), -1);
-        } else {
-            llama_memory_clear(llama_get_memory(g_context), true);
-        }
+        // Always clear KV cache before each generation to ensure zero context overflow
+        llama_memory_clear(llama_get_memory(g_context), true);
 
         auto start_prompt = std::chrono::high_resolution_clock::now();
 
-        // Process only remaining prompt tokens from matching_prefix
-        int32_t pos = static_cast<int32_t>(matching_prefix);
-        int32_t eval_count = tokenCount - static_cast<int32_t>(matching_prefix);
-
-        for (int32_t offset = static_cast<int32_t>(matching_prefix); offset < tokenCount;) {
+        int32_t pos = 0;
+        for (int32_t offset = 0; offset < tokenCount;) {
 
             const int32_t currentBatch = std::min(
                     batchLimit,
@@ -275,9 +300,9 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerateStream(
 
         auto end_prompt = std::chrono::high_resolution_clock::now();
         double prompt_decode_ms = std::chrono::duration<double, std::milli>(end_prompt - start_prompt).count();
-        double prompt_tok_per_sec = prompt_decode_ms > 0 ? (eval_count * 1000.0) / prompt_decode_ms : 0.0;
+        double prompt_tok_per_sec = prompt_decode_ms > 0 ? (tokenCount * 1000.0) / prompt_decode_ms : 0.0;
 
-        LOGI("[Timing ms] Prompt decode: %.2f ms (%d new tokens evaluated, %.2f tok/s)", prompt_decode_ms, eval_count, prompt_tok_per_sec);
+        LOGI("[Timing ms] Prompt decode: %.2f ms (%d tokens, %.2f tok/s)", prompt_decode_ms, tokenCount, prompt_tok_per_sec);
 
         llama_sampler_chain_params samplerParams = llama_sampler_chain_default_params();
         llama_sampler* sampler = llama_sampler_chain_init(samplerParams);
@@ -291,6 +316,8 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerateStream(
         llama_sampler_chain_add(sampler, llama_sampler_init_dist(1234));
 
         std::string result;
+        std::string utf8_stream_accumulator;
+
         auto start_gen = std::chrono::high_resolution_clock::now();
         int genTokenCount = 0;
 
@@ -339,13 +366,23 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerateStream(
 
             if (!pieceStr.empty()) {
                 result.append(pieceStr);
+                utf8_stream_accumulator.append(pieceStr);
                 genTokenCount++;
 
-                if (tokenCallback != nullptr && onTokenMethod != nullptr) {
-                    jstring tokenJStr = env->NewStringUTF(pieceStr.c_str());
+                // Safely emit only complete valid UTF-8 sequences to JNI
+                size_t valid_len = get_valid_utf8_length(utf8_stream_accumulator);
+                if (valid_len > 0 && tokenCallback != nullptr && onTokenMethod != nullptr) {
+                    std::string valid_str = utf8_stream_accumulator.substr(0, valid_len);
+                    utf8_stream_accumulator.erase(0, valid_len);
+
+                    jstring tokenJStr = env->NewStringUTF(valid_str.c_str());
                     if (tokenJStr != nullptr) {
                         env->CallVoidMethod(tokenCallback, onTokenMethod, tokenJStr);
                         env->DeleteLocalRef(tokenJStr);
+                    }
+
+                    if (env->ExceptionCheck()) {
+                        env->ExceptionClear();
                     }
                 }
             }
@@ -374,9 +411,19 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerateStream(
             }
         }
 
-        llama_sampler_free(sampler);
+        // Flush any remaining accumulated UTF-8 bytes at end of stream
+        if (!utf8_stream_accumulator.empty() && tokenCallback != nullptr && onTokenMethod != nullptr) {
+            jstring tokenJStr = env->NewStringUTF(utf8_stream_accumulator.c_str());
+            if (tokenJStr != nullptr) {
+                env->CallVoidMethod(tokenCallback, onTokenMethod, tokenJStr);
+                env->DeleteLocalRef(tokenJStr);
+            }
+            if (env->ExceptionCheck()) {
+                env->ExceptionClear();
+            }
+        }
 
-        g_prev_tokens = tokens;
+        llama_sampler_free(sampler);
 
         auto end_gen = std::chrono::high_resolution_clock::now();
         double generation_ms = std::chrono::duration<double, std::milli>(end_gen - start_gen).count();
@@ -424,7 +471,6 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeReleaseModel(
     LOGI("Releasing llama model...");
 
     try {
-        g_prev_tokens.clear();
         if (g_context != nullptr) {
             llama_free(g_context);
             g_context = nullptr;
