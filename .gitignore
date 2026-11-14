@@ -1,3 +1,7 @@
+# GGUF models and model artifacts
+*.gguf
+ai-model/models/
+
 # Visual Studio and IDEs
 .vs/
 .idea/

@@ -1,14 +1,17 @@
-from unsloth import FastLanguageModel
+import torch
+from peft import AutoPeftModelForCausalLM
+from transformers import AutoTokenizer
 
-LORA_MODEL = "../models/finetuned/vidyanova-qwen-1.5b"
-OUTPUT_DIR = "../models/finetuned/vidyanova-qwen-1.5b-merged"
+LORA_MODEL = "../models/finetuned/vidyanova-qwen-0.5b"
+OUTPUT_DIR = "../models/merged/vidyanova-qwen-0.5b"
 
-model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name=LORA_MODEL,
-    max_seq_length=2048,
-    load_in_4bit=False
+print("Loading model + LoRA adapter...")
+model = AutoPeftModelForCausalLM.from_pretrained(
+    LORA_MODEL,
+    torch_dtype=torch.float32
 )
 
+print("Merging...")
 model = model.merge_and_unload()
 
 model.save_pretrained(
@@ -16,6 +19,7 @@ model.save_pretrained(
     safe_serialization=True
 )
 
+tokenizer = AutoTokenizer.from_pretrained(LORA_MODEL)
 tokenizer.save_pretrained(OUTPUT_DIR)
 
 print("Model merge completed.")
