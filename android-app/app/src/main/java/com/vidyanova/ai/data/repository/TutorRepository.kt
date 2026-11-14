@@ -3,6 +3,7 @@ package com.vidyanova.ai.data.repository
 import android.content.Context
 import android.util.Log
 import com.vidyanova.ai.ai.inference.LocalModelEngine
+import com.vidyanova.ai.ai.inference.TokenCallback
 import com.vidyanova.ai.ai.instruction.PromptBuilder
 import com.vidyanova.ai.ai.instruction.StyleDetector
 import com.vidyanova.ai.ai.instruction.TeachingMode
@@ -28,14 +29,15 @@ class TutorRepository(
     // TEMPORARILY DISABLE FALLBACK RESPONSES FOR TESTING LOCAL QWEN GGUF MODEL
     private val enableFallbackForTesting = false
 
-    fun askTutor(
+    fun askTutorStream(
         question: String,
         classLevel: Int,
         subject: String,
         chapter: String? = null,
         topic: String? = null,
         preferredMode: TeachingMode? = null,
-        preferredLanguage: String? = null
+        preferredLanguage: String? = null,
+        onToken: ((String) -> Unit)? = null
     ): TutorResult {
 
         if (question.isBlank()) {
@@ -53,7 +55,7 @@ class TutorRepository(
             preferredLanguage = preferredLanguage
         )
 
-        var inferenceStartTimeMs: Long? = null
+        val startTime = System.currentTimeMillis()
 
         return try {
             val curriculumContext = curriculumRetriever.buildContext(
@@ -83,15 +85,14 @@ class TutorRepository(
                 detectedStyle = style
             )
 
-            inferenceStartTimeMs = System.currentTimeMillis()
-            val response = modelEngine.generate(prompt)
+            val tokenCallback = if (onToken != null) {
+                TokenCallback { tokenPiece -> onToken(tokenPiece) }
+            } else null
 
-            Log.i(
-                TAG,
-                "LOCAL_MODEL_SUCCESS | Source: LOCAL_QWEN_GGUF | " +
-                    "Generation duration: ${response.generationTimeMs}ms | " +
-                    "Response length: ${response.text.length}"
-            )
+            val response = modelEngine.generateStream(prompt, tokenCallback)
+            val durationMs = System.currentTimeMillis() - startTime
+
+            Log.i(TAG, "LOCAL_MODEL_SUCCESS | Source: LOCAL_QWEN_GGUF | Duration: ${durationMs}ms")
 
             TutorResult(
                 success = true,
@@ -100,15 +101,8 @@ class TutorRepository(
                 language = style.language
             )
         } catch (throwable: Throwable) {
-            val generationDuration = inferenceStartTimeMs?.let {
-                "${System.currentTimeMillis() - it}ms"
-            } ?: "not_started"
-            Log.e(
-                TAG,
-                "LOCAL_MODEL_FAILED | Source: LOCAL_QWEN_GGUF | " +
-                    "Generation duration: $generationDuration | Cause: ${throwable.message}",
-                throwable
-            )
+            val durationMs = System.currentTimeMillis() - startTime
+            Log.e(TAG, "LOCAL_MODEL_FAILED | Source: LOCAL_QWEN_GGUF | Duration: ${durationMs}ms | Cause: ${throwable.message}", throwable)
 
             if (enableFallbackForTesting) {
                 val fallbackAnswer = getEducationalFallback(question, classLevel, subject, preferredLanguage)
@@ -128,6 +122,20 @@ class TutorRepository(
                 )
             }
         }
+    }
+
+    fun askTutor(
+        question: String,
+        classLevel: Int,
+        subject: String,
+        chapter: String? = null,
+        topic: String? = null,
+        preferredMode: TeachingMode? = null,
+        preferredLanguage: String? = null
+    ): TutorResult {
+        return askTutorStream(
+            question, classLevel, subject, chapter, topic, preferredMode, preferredLanguage, null
+        )
     }
 
     private fun getEducationalFallback(

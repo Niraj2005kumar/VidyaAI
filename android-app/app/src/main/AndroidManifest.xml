@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
+        android:name=".VidyaAiApplication"
         android:allowBackup="true"
         android:label="VidyaNova"
         android:supportsRtl="true"

@@ -1,4 +1,3 @@
-
 package com.vidyanova.ai.ai.model
 
 object ModelConfig {
@@ -9,11 +8,12 @@ object ModelConfig {
 
     // Inference configuration
     const val CONTEXT_SIZE = 1024
-    const val THREAD_COUNT = 2
-    const val BATCH_SIZE = 64
+    const val THREAD_COUNT = 4
+    const val BATCH_SIZE = 256
+    const val UBATCH_SIZE = 256
 
     // Response configuration
-    const val MAX_NEW_TOKENS = 64
+    const val MAX_NEW_TOKENS = 192
     const val TEMPERATURE = 0.7f
     const val TOP_P = 0.9f
 

@@ -1,13 +1,16 @@
-# IDE
+# Visual Studio and IDEs
+.vs/
 .idea/
 *.iml
 
-# Android and Gradle
+# Android and Gradle C++ build outputs
 .gradle/
 **/build/
 local.properties
 /gradle-8.9/
 /gradle-8.9-bin.zip
+.cxx/
+**/.cxx/
 
 # Node.js
 node_modules/
@@ -30,12 +33,3 @@ venv/
 *.log
 .DS_Store
 Thumbs.db
-.gradle/
-build/
-**/build/
-.cxx/
-**/.cxx/
-
-.idea/
-*.iml
-local.properties

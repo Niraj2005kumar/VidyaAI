@@ -109,9 +109,7 @@ fun TutorScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
-    DisposableEffect(tutorRepository) {
-        onDispose { tutorRepository.releaseModel() }
-    }
+    // Note: Model is managed at Application level so we do NOT release it when leaving TutorScreen
 
     fun sendMessage(userText: String) {
         val requestId = UUID.randomUUID().toString().subSequence(0, 8).toString()
@@ -157,15 +155,29 @@ fun TutorScreen(
                 android.util.Log.i(TAG, "VIEWMODEL_REQUEST_STARTED | RequestId: $requestId")
                 android.util.Log.i(TAG, "REPOSITORY_REQUEST_STARTED | RequestId: $requestId")
 
+                var streamedText = ""
+
                 val result = withContext(Dispatchers.IO) {
-                    tutorRepository.askTutor(
+                    tutorRepository.askTutorStream(
                         question = userText,
                         classLevel = classLevel,
                         subject = subject,
                         chapter = chapter,
                         topic = topic,
                         preferredMode = selectedStyle.toTeachingMode(),
-                        preferredLanguage = selectedLanguage.lowercase()
+                        preferredLanguage = selectedLanguage.lowercase(),
+                        onToken = { tokenPiece: String ->
+                            streamedText += tokenPiece
+                            coroutineScope.launch(Dispatchers.Main) {
+                                val pendingIndex = messages.indexOfFirst { it.id == pendingMessage.id }
+                                if (pendingIndex >= 0) {
+                                    messages[pendingIndex] = pendingMessage.copy(
+                                        text = streamedText,
+                                        styleTag = selectedStyle.displayName
+                                    )
+                                }
+                            }
+                        }
                     )
                 }
 
@@ -187,10 +199,8 @@ fun TutorScreen(
                             )
                         )
                     }
-                    val snippetLength = if (result.answer.length < 60) result.answer.length else 60
-                    val snippet = if (snippetLength > 0) result.answer.subSequence(0, snippetLength).toString() else ""
                     android.util.Log.i(TAG, "VIEWMODEL_RESPONSE_UPDATED | RequestId: $requestId")
-                    android.util.Log.i(TAG, "CHAT_UI_RESPONSE_RENDERED | RequestId: $requestId | Answer: $snippet")
+                    android.util.Log.i(TAG, "CHAT_UI_RESPONSE_RENDERED | RequestId: $requestId")
                     listState.animateScrollToItem(messages.size - 1)
                 }
 

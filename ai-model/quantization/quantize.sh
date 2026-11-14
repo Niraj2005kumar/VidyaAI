@@ -1,3 +1,7 @@
+param(
+    [string]$QUANT_TYPE = "Q4_0"
+)
+
 $ErrorActionPreference = "Stop"
 
 $LLAMA_CPP = "../../android-app/llama.cpp"
@@ -12,7 +16,7 @@ python "$LLAMA_CPP/convert_hf_to_gguf.py" `
     --outfile $MODEL_OUTPUT `
     --outtype f16
 
-Write-Host "Step 2: Quantizing GGUF to Q4_K_M..."
+Write-Host "Step 2: Quantizing GGUF to $QUANT_TYPE..."
 
 $QUANTIZE_EXE = "$LLAMA_CPP/build/bin/llama-quantize.exe"
 
@@ -33,8 +37,8 @@ Rename-Item $MODEL_OUTPUT "tutor-model-f16.gguf"
 & $QUANTIZE_EXE `
     "../models/quantized/tutor-model-f16.gguf" `
     $MODEL_OUTPUT `
-    Q4_K_M
+    $QUANT_TYPE
 
 Write-Host ""
-Write-Host "Q4_K_M GGUF created successfully:"
+Write-Host "$QUANT_TYPE GGUF created successfully:"
 Write-Host $MODEL_OUTPUT
