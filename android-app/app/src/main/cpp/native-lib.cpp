@@ -311,9 +311,11 @@ Java_com_vidyanova_ai_ai_inference_LocalModelEngine_nativeGenerateStream(
             return throwIllegalState(env, "Sampler initialization failed.");
         }
 
-        llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature));
-        llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.9f, 1));
-        llama_sampler_chain_add(sampler, llama_sampler_init_dist(1234));
+            llama_sampler_chain_add(sampler.get(), llama_sampler_init_penalties(128, 1.15f, 0.0f, 0.0f));
+            llama_sampler_chain_add(sampler.get(), llama_sampler_init_top_k(40));
+            llama_sampler_chain_add(sampler.get(), llama_sampler_init_top_p(0.9f, 1));
+            llama_sampler_chain_add(sampler.get(), llama_sampler_init_temp(safe_temperature));
+            llama_sampler_chain_add(sampler.get(), llama_sampler_init_dist(1234));
 
         std::string result;
         std::string utf8_stream_accumulator;
