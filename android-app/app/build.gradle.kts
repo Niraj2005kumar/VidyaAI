@@ -101,4 +101,8 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // ML Kit On-Device Devanagari + Latin OCR Dependency
+    implementation("com.google.mlkit:text-recognition-devanagari:16.0.0")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
 }
