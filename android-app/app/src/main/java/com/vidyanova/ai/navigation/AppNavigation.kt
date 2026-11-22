@@ -7,9 +7,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.vidyanova.ai.ui.screens.classselection.ClassSelectionScreen
 import com.vidyanova.ai.ui.screens.focusmode.FocusModeScreen
 import com.vidyanova.ai.ui.screens.home.HomeScreen
@@ -24,6 +26,7 @@ import com.vidyanova.ai.ui.screens.quiz.QuizScreen
 import com.vidyanova.ai.ui.screens.scanlearn.ScanLearnScreen
 import com.vidyanova.ai.ui.screens.settings.SettingsScreen
 import com.vidyanova.ai.ui.screens.splash.SplashScreen
+import com.vidyanova.ai.ui.screens.subject.SubjectListScreen
 import com.vidyanova.ai.ui.screens.subjects.SubjectScreen
 import com.vidyanova.ai.ui.screens.subjects.TopicSelectionScreen
 import com.vidyanova.ai.ui.screens.teacherslip.TeacherSlipScreen
@@ -78,6 +81,32 @@ fun VidyaNovaNavHost(
             HomeScreen(
                 onNavigateTo = { route ->
                     navController.navigate(route)
+                }
+            )
+        }
+
+        composable(
+            route = "subjectList/{categoryName}",
+            arguments = listOf(navArgument("categoryName") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val catName = backStackEntry.arguments?.getString("categoryName") ?: "BCS"
+            SubjectListScreen(
+                categoryName = catName.uppercase(),
+                onBack = { navController.popBackStack() },
+                onSelectSubject = { subjectName ->
+                    selectedSubject = subjectName
+                    navController.navigate("quiz")
+                }
+            )
+        }
+
+        composable("subjectList") {
+            SubjectListScreen(
+                categoryName = "BCS",
+                onBack = { navController.popBackStack() },
+                onSelectSubject = { subjectName ->
+                    selectedSubject = subjectName
+                    navController.navigate("quiz")
                 }
             )
         }
