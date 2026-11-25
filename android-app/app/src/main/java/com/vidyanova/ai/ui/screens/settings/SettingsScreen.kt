@@ -19,12 +19,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Psychology
@@ -63,6 +65,7 @@ import androidx.compose.ui.unit.sp
 import com.vidyanova.ai.data.local.database.AppDatabase
 import com.vidyanova.ai.data.local.datastore.UserPreferences
 import com.vidyanova.ai.data.local.sync.SyncWorker
+import com.vidyanova.ai.data.repository.AuthRepository
 import com.vidyanova.ai.ui.components.AppTopBar
 import com.vidyanova.ai.ui.components.BottomNavigationBar
 import com.vidyanova.ai.ui.theme.Primary
@@ -88,12 +91,13 @@ fun SettingsScreen(
     val lastSyncTime by userPrefs.lastSyncTimeFlow.collectAsState(initial = 0L)
     val studentName by userPrefs.studentNameFlow.collectAsState(initial = "Guest Student")
     val classLevel by userPrefs.classLevelFlow.collectAsState(initial = 10)
+    val selectedLanguage by userPrefs.preferredLanguageFlow.collectAsState(initial = "Hinglish")
+    val selectedExplanationStyle by userPrefs.preferredStyleFlow.collectAsState(initial = "Step-by-Step")
 
     var showConsentDialog by remember { mutableStateOf(false) }
+    var showClassDialog by remember { mutableStateOf(false) }
 
-    var selectedLanguage by remember { mutableStateOf("Hinglish") }
     var selectedTheme by remember { mutableStateOf("System Default") }
-    var selectedExplanationStyle by remember { mutableStateOf("Step-by-Step") }
     var notificationsEnabled by remember { mutableStateOf(true) }
 
     val languages = listOf("English", "Hindi", "Hinglish")
@@ -106,40 +110,38 @@ fun SettingsScreen(
         return sdf.format(Date(timeMs))
     }
 
-    // Show Consent Dialog if not answered yet
-    if (syncConsent == null || showConsentDialog) {
+    // Class Selector Dialog
+    if (showClassDialog) {
         AlertDialog(
-            onDismissRequest = { showConsentDialog = false },
-            title = { Text("Cloud Backup Consent", fontWeight = FontWeight.Bold) },
+            onDismissRequest = { showClassDialog = false },
+            title = { Text("Select Class Level", fontWeight = FontWeight.Bold) },
             text = {
-                Text("Apna study progress aur quiz results cloud par safe backup karna chahte hain?")
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        coroutineScope.launch {
-                            userPrefs.saveSyncConsent(true)
-                            SyncWorker.scheduleOneTimeSync(context)
-                            showConsentDialog = false
-                            Toast.makeText(context, "Cloud sync enabled!", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
-                ) {
-                    Text("Haan, Sync Karein")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        coroutineScope.launch {
-                            userPrefs.saveSyncConsent(false)
-                            showConsentDialog = false
-                            Toast.makeText(context, "Data phone me local rahega.", Toast.LENGTH_SHORT).show()
+                Column {
+                    (1..10).forEach { level ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    coroutineScope.launch {
+                                        userPrefs.saveClassLevel(level)
+                                        showClassDialog = false
+                                        Toast.makeText(context, "Class $level selected!", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                .padding(vertical = 10.dp, horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Class $level", fontSize = 16.sp, fontWeight = if (level == classLevel) FontWeight.Bold else FontWeight.Normal)
+                            if (level == classLevel) {
+                                Text("✓", color = Primary, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
-                ) {
-                    Text("Nahi (Local Only)", color = Color.Gray)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showClassDialog = false }) {
+                    Text("Close")
                 }
             }
         )
@@ -176,15 +178,16 @@ fun SettingsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clickable { showClassDialog = true }
                                 .padding(vertical = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
                                 Text(text = studentName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                                Text(text = "Class $classLevel • Secondary Level", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(text = "Class $classLevel • Secondary Level (Tap to change)", style = MaterialTheme.typography.bodySmall, color = Primary)
                             }
-                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Primary)
                         }
                     }
                 }
@@ -208,6 +211,9 @@ fun SettingsScreen(
                                         userPrefs.saveSyncConsent(consent)
                                         if (consent) {
                                             SyncWorker.scheduleOneTimeSync(context)
+                                            Toast.makeText(context, "Cloud sync enabled!", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Cloud sync disabled.", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 },
@@ -230,11 +236,10 @@ fun SettingsScreen(
 
                             Button(
                                 onClick = {
-                                    if (syncConsent == true) {
+                                    coroutineScope.launch {
+                                        userPrefs.saveSyncConsent(true)
                                         SyncWorker.scheduleOneTimeSync(context)
-                                        Toast.makeText(context, "Syncing started...", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        showConsentDialog = true
+                                        Toast.makeText(context, "Syncing with cloud started...", Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = Primary),
@@ -253,7 +258,7 @@ fun SettingsScreen(
                     SettingsCard(title = "Learning", icon = Icons.Default.School) {
                         SettingsRow(label = "Target Goal", value = "60 min / day")
                         Spacer(modifier = Modifier.height(10.dp))
-                        SettingsRow(label = "Target Exam", value = "Class 10 CBSE Boards")
+                        SettingsRow(label = "Class Level", value = "Class $classLevel")
                     }
                 }
 
@@ -265,14 +270,19 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             languages.forEach { lang ->
-                                val isSelected = lang == selectedLanguage
+                                val isSelected = lang.equals(selectedLanguage, ignoreCase = true)
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(50))
                                         .background(
                                             if (isSelected) Primary else MaterialTheme.colorScheme.surfaceVariant
                                         )
-                                        .clickable { selectedLanguage = lang }
+                                        .clickable {
+                                            coroutineScope.launch {
+                                                userPrefs.savePreferredLanguage(lang)
+                                                Toast.makeText(context, "Language set to $lang", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
                                         .padding(horizontal = 14.dp, vertical = 7.dp)
                                 ) {
                                     Text(
@@ -292,12 +302,17 @@ fun SettingsScreen(
                     SettingsCard(title = "Explanation Style", icon = Icons.Default.Psychology) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             styles.forEach { style ->
-                                val isSelected = style == selectedExplanationStyle
+                                val isSelected = style.equals(selectedExplanationStyle, ignoreCase = true)
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp))
-                                        .clickable { selectedExplanationStyle = style }
+                                        .clickable {
+                                            coroutineScope.launch {
+                                                userPrefs.savePreferredStyle(style)
+                                                Toast.makeText(context, "Explanation style set to $style", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
                                         .background(
                                             if (isSelected) Secondary.copy(alpha = 0.1f) else Color.Transparent
                                         )
@@ -383,7 +398,7 @@ fun SettingsScreen(
                                         db.clearAllTables()
                                         userPrefs.clearAllData()
                                         launch(Dispatchers.Main) {
-                                            Toast.makeText(context, "Local data cleared on phone!", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "All local data cleared successfully!", Toast.LENGTH_SHORT).show()
                                         }
                                     } catch (e: Exception) {
                                         launch(Dispatchers.Main) {
@@ -396,6 +411,31 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text("Clear All My Local Data", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                // Section: Account & Logout
+                item {
+                    SettingsCard(title = "Account & Logout", icon = Icons.AutoMirrored.Filled.Logout) {
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    AuthRepository.logout()
+                                    userPrefs.clearAllData()
+                                    Toast.makeText(context, "Logged out successfully!", Toast.LENGTH_SHORT).show()
+                                    onNavigate?.invoke("login")
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Log Out", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

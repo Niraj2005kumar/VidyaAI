@@ -21,8 +21,8 @@ class SyncManager(private val context: Context) {
 
     suspend fun performFullSync(): Boolean = withContext(Dispatchers.IO) {
         val consent = userPrefs.syncConsentFlow.first()
-        if (consent != true) {
-            Log.i(TAG, "Sync skipped: User has not enabled cloud sync consent.")
+        if (consent == false) {
+            Log.i(TAG, "Sync skipped: User has disabled cloud sync consent.")
             return@withContext false
         }
 
@@ -40,9 +40,9 @@ class SyncManager(private val context: Context) {
 
     private suspend fun ensureDeviceToken() {
         var token = userPrefs.authTokenFlow.first()
-        if (token.isNullOrBlank()) {
+        if (token.isNullOrBlank() || token.startsWith("offline_local_token_")) {
             val deviceId = userPrefs.getOrCreateDeviceId()
-            Log.i(TAG, "Requesting device auth token for deviceId: $deviceId")
+            Log.i(TAG, "Requesting real device auth token for deviceId: $deviceId")
 
             val authReq = JsonObject().apply {
                 addProperty("deviceId", deviceId)
@@ -50,16 +50,20 @@ class SyncManager(private val context: Context) {
                 addProperty("classLevel", userPrefs.classLevelFlow.first())
             }
 
-            val response = RetrofitClient.apiService.authDevice(authReq)
-            if (response.isSuccessful && response.body()?.success == true) {
-                val newToken = response.body()?.token
-                if (!newToken.isNullOrBlank()) {
-                    userPrefs.saveAuthToken(newToken)
-                    AuthTokenStore.saveToken(newToken)
-                    Log.i(TAG, "Device token acquired and saved.")
+            try {
+                val response = RetrofitClient.apiService.authDevice(authReq)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    val newToken = response.body()?.token
+                    if (!newToken.isNullOrBlank()) {
+                        userPrefs.saveAuthToken(newToken)
+                        AuthTokenStore.saveToken(newToken)
+                        Log.i(TAG, "Real MongoDB Device token acquired and saved.")
+                    }
+                } else {
+                    Log.w(TAG, "Device token request failed HTTP ${response.code()}")
                 }
-            } else {
-                Log.w(TAG, "Device token request failed HTTP ${response.code()}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Unable to reach auth server: ${e.message}")
             }
         } else {
             AuthTokenStore.saveToken(token)
@@ -158,7 +162,7 @@ class SyncManager(private val context: Context) {
 
         val response = RetrofitClient.apiService.syncPush(pushBody)
         if (response.isSuccessful && response.body()?.get("success")?.asBoolean == true) {
-          val acceptedObj = response.body()?.getAsJsonObject("accepted")
+            val acceptedObj = response.body()?.getAsJsonObject("accepted")
             if (acceptedObj != null) {
                 // Mark accepted clientIds as synced
                 parseAndMarkSynced(acceptedObj.getAsJsonArray("chatMessages")) { ids -> db.chatMessageDao().markAsSynced(ids) }
@@ -167,7 +171,7 @@ class SyncManager(private val context: Context) {
                 parseAndMarkSynced(acceptedObj.getAsJsonArray("quizAttempts")) { ids -> db.quizAttemptDao().markAsSynced(ids) }
                 parseAndMarkSynced(acceptedObj.getAsJsonArray("scans")) { ids -> db.scanRecordDao().markAsSynced(ids) }
             }
-            Log.i(TAG, "Push sync succeeded.")
+            Log.i(TAG, "Push sync to MongoDB succeeded.")
         } else {
             Log.w(TAG, "Push sync HTTP failed ${response.code()}")
         }

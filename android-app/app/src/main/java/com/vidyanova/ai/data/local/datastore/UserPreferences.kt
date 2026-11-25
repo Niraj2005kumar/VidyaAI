@@ -87,6 +87,26 @@ class UserPreferences(private val context: Context) {
         }
     }
 
+    val preferredLanguageFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[PREFERRED_LANGUAGE_KEY] ?: "Hinglish"
+    }
+
+    suspend fun savePreferredLanguage(language: String) {
+        context.dataStore.edit { prefs ->
+            prefs[PREFERRED_LANGUAGE_KEY] = language
+        }
+    }
+
+    val preferredStyleFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[PREFERRED_STYLE_KEY] ?: "Step-by-Step"
+    }
+
+    suspend fun savePreferredStyle(style: String) {
+        context.dataStore.edit { prefs ->
+            prefs[PREFERRED_STYLE_KEY] = style
+        }
+    }
+
     suspend fun saveStudentProfile(name: String, email: String, classLevel: Int) {
         context.dataStore.edit { prefs ->
             prefs[STUDENT_NAME_KEY] = name

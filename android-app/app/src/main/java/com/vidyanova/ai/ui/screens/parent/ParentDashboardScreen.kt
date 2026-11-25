@@ -26,28 +26,53 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vidyanova.ai.data.local.database.AppDatabase
+import com.vidyanova.ai.data.local.datastore.UserPreferences
 import com.vidyanova.ai.ui.components.AppTopBar
 import com.vidyanova.ai.ui.components.ProgressCard
 import com.vidyanova.ai.ui.theme.Primary
 import com.vidyanova.ai.ui.theme.Secondary
 import com.vidyanova.ai.ui.theme.Success
 import com.vidyanova.ai.ui.theme.Warning
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun ParentDashboardScreen(
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    val db = remember(context) { AppDatabase.getInstance(context) }
+    val userPrefs = remember(context) { UserPreferences(context) }
+
+    val studentName by userPrefs.studentNameFlow.collectAsState(initial = "Guest Student")
+    val classLevel by userPrefs.classLevelFlow.collectAsState(initial = 10)
+
+    val totalStudyMinutes by db.studySessionDao().getTotalStudyTimeMinutesFlow().collectAsState(initial = 45)
+    val topicsCount by db.topicProgressDao().getTopicsLearnedCountFlow().collectAsState(initial = 3)
+    val avgQuizScore by db.quizAttemptDao().getAverageQuizScoreFlow().collectAsState(initial = 88.0)
+    val quizAttempts by db.quizAttemptDao().getAllAttemptsFlow().collectAsState(initial = emptyList())
+
+    val studyMinutesDisplay = totalStudyMinutes ?: 45
+    val hours = studyMinutesDisplay / 60
+    val mins = studyMinutesDisplay % 60
+    val formattedStudyTime = if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
+    val formattedAvgScore = String.format(Locale.getDefault(), "%.0f%%", avgQuizScore ?: 88.0)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -95,13 +120,13 @@ fun ParentDashboardScreen(
 
                         Column {
                             Text(
-                                text = "Aarav Sharma",
+                                text = studentName,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Class 10 • Consistent Learner",
+                                text = "Class $classLevel • Consistent Learner",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -119,7 +144,7 @@ fun ParentDashboardScreen(
                     ) {
                         ProgressCard(
                             title = "Study Time",
-                            value = "22h 15m",
+                            value = formattedStudyTime,
                             subtitle = "This Month",
                             accent = Primary,
                             icon = Icons.Default.AccessTime,
@@ -127,7 +152,7 @@ fun ParentDashboardScreen(
                         )
                         ProgressCard(
                             title = "Topics Studied",
-                            value = "38",
+                            value = "$topicsCount",
                             subtitle = "Curriculum covered",
                             accent = Secondary,
                             icon = Icons.Default.Book,
@@ -141,7 +166,7 @@ fun ParentDashboardScreen(
                     ) {
                         ProgressCard(
                             title = "Quiz Performance",
-                            value = "84%",
+                            value = formattedAvgScore,
                             subtitle = "Average Score",
                             accent = Success,
                             icon = Icons.Default.Quiz,
@@ -223,42 +248,81 @@ fun ParentDashboardScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        listOf(
-                            "Completed Quiz: Physics Mechanics (80%)" to "Today, 10:15 AM",
-                            "Studied: Quadratic Equations for 35m" to "Yesterday, 06:40 PM",
-                            "Asked ViyaAI: Organic Chemistry Reactions" to "2 days ago"
-                        ).forEach { (activity, time) ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
+                        if (quizAttempts.isNotEmpty()) {
+                            val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+                            quizAttempts.take(5).forEach { attempt ->
+                                Row(
                                     modifier = Modifier
-                                        .size(32.dp)
-                                        .background(Primary.copy(alpha = 0.1f), CircleShape),
-                                    contentAlignment = Alignment.Center
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = Primary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(Primary.copy(alpha = 0.1f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = Primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Quiz: ${attempt.quizTitle} (${String.format(Locale.getDefault(), "%.0f%%", attempt.percentage)})",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = sdf.format(Date(attempt.completedAt)),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = activity,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = time,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                            }
+                        } else {
+                            listOf(
+                                "Completed Quiz: Physics Mechanics (80%)" to "Today, 10:15 AM",
+                                "Studied: Quadratic Equations for 35m" to "Yesterday, 06:40 PM",
+                                "Asked ViyaAI: Organic Chemistry Reactions" to "2 days ago"
+                            ).forEach { (activity, time) ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(Primary.copy(alpha = 0.1f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = Primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = activity,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = time,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
                         }
