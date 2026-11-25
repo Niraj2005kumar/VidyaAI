@@ -12,6 +12,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.vidyanova.ai.data.network.AuthTokenStore
+import com.vidyanova.ai.ui.screens.auth.LoginScreen
 import com.vidyanova.ai.ui.screens.classselection.ClassSelectionScreen
 import com.vidyanova.ai.ui.screens.focusmode.FocusModeScreen
 import com.vidyanova.ai.ui.screens.home.HomeScreen
@@ -35,7 +37,7 @@ import com.vidyanova.ai.ui.screens.tutor.TutorScreen
 @Composable
 fun VidyaNovaNavHost(
     navController: NavHostController = rememberNavController(),
-    startDestination: String = "home"
+    startDestination: String = if (AuthTokenStore.getToken().isNullOrBlank()) "login" else "home"
 ) {
     var selectedClassLevel by remember { mutableIntStateOf(10) }
     var selectedSubject by remember { mutableStateOf("Mathematics") }
@@ -46,10 +48,25 @@ fun VidyaNovaNavHost(
         navController = navController,
         startDestination = startDestination
     ) {
+        composable("login") {
+            LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate("home") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                },
+                onContinueGuest = {
+                    navController.navigate("home") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable("splash") {
             SplashScreen(
                 onNavigateNext = {
-                    navController.navigate("onboarding") {
+                    navController.navigate("login") {
                         popUpTo("splash") { inclusive = true }
                     }
                 }
@@ -59,7 +76,7 @@ fun VidyaNovaNavHost(
         composable("onboarding") {
             OnboardingScreen(
                 onGetStarted = {
-                    navController.navigate("classSelection") {
+                    navController.navigate("login") {
                         popUpTo("onboarding") { inclusive = true }
                     }
                 }

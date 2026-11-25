@@ -15,10 +15,19 @@ const authMiddleware = (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    const userId = decoded.id || decoded.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid authentication token payload',
+      });
+    }
+
     req.user = {
-      id: decoded.userId,
-      userId: decoded.userId,
-      role: decoded.role,
+      id: userId,
+      userId: userId,
+      role: decoded.role || 'student',
     };
 
     next();

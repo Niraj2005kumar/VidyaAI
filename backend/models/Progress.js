@@ -8,6 +8,12 @@ const progressSchema = new mongoose.Schema(
       required: true,
     },
 
+    clientId: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+
     classLevel: {
       type: Number,
       required: true,
@@ -76,6 +82,8 @@ const progressSchema = new mongoose.Schema(
     timestamps: true,
   },
 );
+
+progressSchema.index({ user: 1, clientId: 1 }, { unique: true, sparse: true });
 
 const Progress = mongoose.model('Progress', progressSchema);
 

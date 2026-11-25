@@ -1,5 +1,6 @@
 package com.vidyanova.ai.ui.screens.settings
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +20,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
@@ -28,37 +31,66 @@ import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vidyanova.ai.data.local.database.AppDatabase
+import com.vidyanova.ai.data.local.datastore.UserPreferences
+import com.vidyanova.ai.data.local.sync.SyncWorker
 import com.vidyanova.ai.ui.components.AppTopBar
 import com.vidyanova.ai.ui.components.BottomNavigationBar
 import com.vidyanova.ai.ui.theme.Primary
 import com.vidyanova.ai.ui.theme.Secondary
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
     onNavigate: ((String) -> Unit)? = null
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val userPrefs = remember(context) { UserPreferences(context) }
+    val db = remember(context) { AppDatabase.getInstance(context) }
+
+    val syncConsent by userPrefs.syncConsentFlow.collectAsState(initial = false)
+    val lastSyncTime by userPrefs.lastSyncTimeFlow.collectAsState(initial = 0L)
+    val studentName by userPrefs.studentNameFlow.collectAsState(initial = "Guest Student")
+    val classLevel by userPrefs.classLevelFlow.collectAsState(initial = 10)
+
+    var showConsentDialog by remember { mutableStateOf(false) }
+
     var selectedLanguage by remember { mutableStateOf("Hinglish") }
     var selectedTheme by remember { mutableStateOf("System Default") }
     var selectedExplanationStyle by remember { mutableStateOf("Step-by-Step") }
@@ -67,6 +99,51 @@ fun SettingsScreen(
     val languages = listOf("English", "Hindi", "Hinglish")
     val themes = listOf("Light", "Dark", "System Default")
     val styles = listOf("Simple", "Detailed", "Step-by-Step", "Exam Ready")
+
+    fun formatLastSync(timeMs: Long): String {
+        if (timeMs == 0L) return "Never synced"
+        val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+        return sdf.format(Date(timeMs))
+    }
+
+    // Show Consent Dialog if not answered yet
+    if (syncConsent == null || showConsentDialog) {
+        AlertDialog(
+            onDismissRequest = { showConsentDialog = false },
+            title = { Text("Cloud Backup Consent", fontWeight = FontWeight.Bold) },
+            text = {
+                Text("Apna study progress aur quiz results cloud par safe backup karna chahte hain?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            userPrefs.saveSyncConsent(true)
+                            SyncWorker.scheduleOneTimeSync(context)
+                            showConsentDialog = false
+                            Toast.makeText(context, "Cloud sync enabled!", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                ) {
+                    Text("Haan, Sync Karein")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            userPrefs.saveSyncConsent(false)
+                            showConsentDialog = false
+                            Toast.makeText(context, "Data phone me local rahega.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) {
+                    Text("Nahi (Local Only)", color = Color.Gray)
+                }
+            }
+        )
+    }
 
     Scaffold(
         bottomBar = {
@@ -104,10 +181,69 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text(text = "Aarav Sharma", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                                Text(text = "Class 10 • Secondary Level", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(text = studentName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
+                                Text(text = "Class $classLevel • Secondary Level", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+
+                // Section: Cloud Sync & Backup
+                item {
+                    SettingsCard(title = "Cloud Sync & Backup", icon = Icons.Default.CloudSync) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = "Auto Cloud Sync", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text(text = "Backup progress to MongoDB server", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(
+                                checked = syncConsent == true,
+                                onCheckedChange = { consent ->
+                                    coroutineScope.launch {
+                                        userPrefs.saveSyncConsent(consent)
+                                        if (consent) {
+                                            SyncWorker.scheduleOneTimeSync(context)
+                                        }
+                                    }
+                                },
+                                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Primary)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Last synced: ${formatLastSync(lastSyncTime)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Button(
+                                onClick = {
+                                    if (syncConsent == true) {
+                                        SyncWorker.scheduleOneTimeSync(context)
+                                        Toast.makeText(context, "Syncing started...", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        showConsentDialog = true
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.Cloud, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Sync Now", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -235,27 +371,32 @@ fun SettingsScreen(
                     }
                 }
 
-                // Section: Parent Controls
+                // Section: Storage & Clear Data
                 item {
-                    SettingsCard(title = "Parent Controls", icon = Icons.Default.Security) {
-                        SettingsRow(label = "Security PIN", value = "Configured (••••)")
-                        Spacer(modifier = Modifier.height(10.dp))
-                        SettingsRow(label = "Daily Screen Limit", value = "2 Hours")
-                    }
-                }
-
-                // Section: Storage
-                item {
-                    SettingsCard(title = "Storage", icon = Icons.Default.Storage) {
-                        SettingsRow(label = "Cached Model & Lessons", value = "245 MB")
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "Clear Cache",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Primary,
-                            modifier = Modifier.clickable { /* Clear Cache */ }
-                        )
+                    SettingsCard(title = "Storage & Data", icon = Icons.Default.Storage) {
+                        SettingsRow(label = "Cached Local Database", value = "Room DB Active")
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = {
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    try {
+                                        db.clearAllTables()
+                                        userPrefs.clearAllData()
+                                        launch(Dispatchers.Main) {
+                                            Toast.makeText(context, "Local data cleared on phone!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        launch(Dispatchers.Main) {
+                                            Toast.makeText(context, "Error clearing data: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Clear All My Local Data", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 

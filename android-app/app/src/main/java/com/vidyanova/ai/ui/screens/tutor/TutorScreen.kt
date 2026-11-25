@@ -58,6 +58,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vidyanova.ai.VidyaAiApplication
 import com.vidyanova.ai.ai.instruction.TeachingMode
+import com.vidyanova.ai.data.local.database.AppDatabase
+import com.vidyanova.ai.data.local.entities.ChatMessageEntity
+import com.vidyanova.ai.data.local.sync.SyncWorker
 import com.vidyanova.ai.data.repository.ProgressRepository
 import com.vidyanova.ai.data.repository.TutorRepository
 import com.vidyanova.ai.ui.components.OfflineIndicatorBadge
@@ -83,6 +86,7 @@ fun TutorScreen(
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as? VidyaAiApplication
+    val db = remember(context) { AppDatabase.getInstance(context) }
     val setupProgress by (app?.setupProgress ?: MutableStateFlow(100)).collectAsState()
     val isSetupComplete by (app?.isSetupComplete ?: MutableStateFlow(true)).collectAsState()
 
@@ -207,6 +211,33 @@ fun TutorScreen(
                     android.util.Log.i(TAG, "VIEWMODEL_RESPONSE_UPDATED | RequestId: $requestId")
                     android.util.Log.i(TAG, "CHAT_UI_RESPONSE_RENDERED | RequestId: $requestId")
                     listState.animateScrollToItem(messages.size - 1)
+                }
+
+                // Save to Room DB & trigger SyncWorker
+                withContext(Dispatchers.IO) {
+                    try {
+                        db.chatMessageDao().insert(
+                            ChatMessageEntity(
+                                role = "user",
+                                text = userText,
+                                mode = result.mode,
+                                language = selectedLanguage.lowercase(),
+                                synced = false
+                            )
+                        )
+                        db.chatMessageDao().insert(
+                            ChatMessageEntity(
+                                role = "assistant",
+                                text = result.answer,
+                                mode = result.mode,
+                                language = selectedLanguage.lowercase(),
+                                synced = false
+                            )
+                        )
+                        SyncWorker.scheduleOneTimeSync(context)
+                    } catch (e: Exception) {
+                        android.util.Log.e(TAG, "Error saving chat to Room: ${e.message}")
+                    }
                 }
 
                 if (result.success) {

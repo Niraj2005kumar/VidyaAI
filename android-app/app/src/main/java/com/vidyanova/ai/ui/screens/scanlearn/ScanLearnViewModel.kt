@@ -5,6 +5,9 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.vidyanova.ai.data.local.database.AppDatabase
+import com.vidyanova.ai.data.local.entities.ScanRecordEntity
+import com.vidyanova.ai.data.local.sync.SyncWorker
 import com.vidyanova.ai.ocr.MLKitOCR
 import com.vidyanova.ai.ocr.OCRProcessor
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +27,7 @@ data class ScanLearnUiState(
 class ScanLearnViewModel(application: Application) : AndroidViewModel(application) {
 
     private val ocrEngine = MLKitOCR()
+    private val db = AppDatabase.getInstance(application)
 
     private val _uiState = MutableStateFlow(ScanLearnUiState())
     val uiState: StateFlow<ScanLearnUiState> = _uiState.asStateFlow()
@@ -61,6 +65,18 @@ class ScanLearnViewModel(application: Application) : AndroidViewModel(applicatio
                         errorMessage = null
                     )
                     Log.i(TAG, "OCR success: ${cleanedText.length} chars extracted")
+
+                    try {
+                        db.scanRecordDao().insert(
+                            ScanRecordEntity(
+                                text = cleanedText,
+                                synced = false
+                            )
+                        )
+                        SyncWorker.scheduleOneTimeSync(getApplication())
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error saving scan record: ${e.message}")
+                    }
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,

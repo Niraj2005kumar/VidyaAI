@@ -154,4 +154,84 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// ===============================
+// DEVICE AUTH (30-day JWT)
+// POST /api/auth/device
+// ===============================
+router.post('/device', async (req, res) => {
+  try {
+    const { deviceId, name, classLevel, preferredLanguage } = req.body;
+
+    if (!deviceId || typeof deviceId !== 'string' || !deviceId.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'deviceId is required',
+      });
+    }
+
+    const cleanDeviceId = deviceId.trim();
+
+    let user = await User.findOne({ deviceId: cleanDeviceId });
+
+    if (!user) {
+      user = await User.create({
+        deviceId: cleanDeviceId,
+        name: name ? name.trim() : 'Guest Student',
+        role: 'student',
+        classLevel: classLevel !== undefined ? Number(classLevel) : 10,
+        preferredLanguage: preferredLanguage || 'english',
+      });
+    } else {
+      let updated = false;
+      if (name && name.trim()) {
+        user.name = name.trim();
+        updated = true;
+      }
+      if (classLevel !== undefined) {
+        user.classLevel = Number(classLevel);
+        updated = true;
+      }
+      if (preferredLanguage) {
+        user.preferredLanguage = preferredLanguage;
+        updated = true;
+      }
+      if (updated) {
+        await user.save();
+      }
+    }
+
+    const token = jwt.sign(
+      {
+        id: user._id.toString(),
+        role: user.role,
+        deviceId: user.deviceId,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: '30d',
+      },
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Device authentication successful',
+      token,
+      user: {
+        id: user._id,
+        deviceId: user.deviceId,
+        name: user.name,
+        role: user.role,
+        classLevel: user.classLevel,
+        preferredLanguage: user.preferredLanguage,
+      },
+    });
+  } catch (error) {
+    console.error('Device auth error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Device authentication failed',
+    });
+  }
+});
+
 export default router;

@@ -8,16 +8,27 @@ const quizAttemptSchema = new mongoose.Schema(
       required: true,
     },
 
+    clientId: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+
     quiz: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Quiz',
-      required: true,
+      required: false,
+    },
+
+    quizTitle: {
+      type: String,
+      default: 'Quiz Attempt',
     },
 
     answers: [
       {
         questionId: {
-          type: mongoose.Schema.Types.ObjectId,
+          type: String,
         },
 
         selectedAnswer: {
@@ -65,6 +76,8 @@ const quizAttemptSchema = new mongoose.Schema(
     timestamps: true,
   },
 );
+
+quizAttemptSchema.index({ user: 1, clientId: 1 }, { unique: true, sparse: true });
 
 const QuizAttempt = mongoose.model('QuizAttempt', quizAttemptSchema);
 

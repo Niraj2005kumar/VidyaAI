@@ -1,5 +1,6 @@
 package com.vidyanova.ai.ui.screens.focusmode
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,31 +34,81 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vidyanova.ai.data.local.database.AppDatabase
+import com.vidyanova.ai.data.local.entities.StudySessionEntity
+import com.vidyanova.ai.data.local.sync.SyncWorker
+import com.vidyanova.ai.data.repository.ProgressRepository
 import com.vidyanova.ai.ui.components.AppTopBar
 import com.vidyanova.ai.ui.theme.Primary
 import com.vidyanova.ai.ui.theme.Secondary
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun FocusModeScreen(
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val db = remember(context) { AppDatabase.getInstance(context) }
+
     val durations = listOf(25, 45, 60)
     var selectedMinutes by remember { mutableIntStateOf(25) }
+    var remainingSeconds by remember { mutableIntStateOf(25 * 60) }
     var isRunning by remember { mutableStateOf(false) }
+
+    // Live Countdown Coroutine Loop
+    LaunchedEffect(isRunning, remainingSeconds) {
+        if (isRunning && remainingSeconds > 0) {
+            delay(1000L)
+            remainingSeconds -= 1
+        } else if (isRunning && remainingSeconds == 0) {
+            isRunning = false
+            Toast.makeText(context, "Great job! Focus session completed 🎉", Toast.LENGTH_LONG).show()
+            coroutineScope.launch(Dispatchers.IO) {
+                try {
+                    db.studySessionDao().insert(
+                        StudySessionEntity(
+                            subject = "General Focus",
+                            durationMinutes = selectedMinutes,
+                            synced = false
+                        )
+                    )
+                    SyncWorker.scheduleOneTimeSync(context)
+                    ProgressRepository.recordStudyTime(selectedMinutes)
+                } catch (e: Exception) {
+                    // Ignore recording error
+                }
+            }
+        }
+    }
+
+    fun formatTime(totalSecs: Int): String {
+        val mins = totalSecs / 60
+        val secs = totalSecs % 60
+        return String.format("%02d:%02d", mins, secs)
+    }
+
+    val totalSeconds = selectedMinutes * 60
+    val progressFraction = if (totalSeconds > 0) remainingSeconds.toFloat() / totalSeconds.toFloat() else 0f
 
     Column(
         modifier = Modifier
@@ -101,7 +152,10 @@ fun FocusModeScreen(
                                 if (isSelected) Primary else MaterialTheme.colorScheme.surface
                             )
                             .clickable {
-                                if (!isRunning) selectedMinutes = duration
+                                if (!isRunning) {
+                                    selectedMinutes = duration
+                                    remainingSeconds = duration * 60
+                                }
                             }
                             .padding(horizontal = 20.dp, vertical = 10.dp)
                     ) {
@@ -126,7 +180,7 @@ fun FocusModeScreen(
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(
-                    progress = { if (isRunning) 0.65f else 1f },
+                    progress = { progressFraction },
                     modifier = Modifier.size(220.dp),
                     strokeWidth = 10.dp,
                     color = Primary,
@@ -142,7 +196,7 @@ fun FocusModeScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = if (isRunning) "16:24" else "${selectedMinutes}:00",
+                        text = formatTime(remainingSeconds),
                         fontSize = 44.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -166,7 +220,12 @@ fun FocusModeScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Button(
-                    onClick = { isRunning = true },
+                    onClick = {
+                        if (remainingSeconds == 0) {
+                            remainingSeconds = selectedMinutes * 60
+                        }
+                        isRunning = true
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .height(52.dp),
@@ -194,7 +253,10 @@ fun FocusModeScreen(
                 }
 
                 OutlinedButton(
-                    onClick = { isRunning = false },
+                    onClick = {
+                        isRunning = false
+                        remainingSeconds = selectedMinutes * 60
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .height(52.dp),

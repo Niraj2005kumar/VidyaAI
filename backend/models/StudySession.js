@@ -8,6 +8,12 @@ const studySessionSchema = new mongoose.Schema(
       required: true,
     },
 
+    clientId: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+
     subject: {
       type: String,
       required: true,
@@ -38,6 +44,8 @@ const studySessionSchema = new mongoose.Schema(
     timestamps: true,
   },
 );
+
+studySessionSchema.index({ user: 1, clientId: 1 }, { unique: true, sparse: true });
 
 const StudySession = mongoose.model('StudySession', studySessionSchema);
 

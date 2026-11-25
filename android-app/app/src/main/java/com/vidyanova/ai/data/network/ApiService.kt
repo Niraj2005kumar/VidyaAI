@@ -66,6 +66,18 @@ interface ApiService {
         @Body request: RegisterRequest
     ): Response<AuthResponse>
 
+    @POST("api/auth/device")
+    suspend fun authDevice(@Body request: JsonObject): Response<AuthResponse>
+
+    @POST("api/sync/push")
+    suspend fun syncPush(@Body request: JsonObject): Response<JsonObject>
+
+    @GET("api/sync/pull")
+    suspend fun syncPull(@Query("since") since: String): Response<JsonObject>
+
+    @GET("api/sync/status")
+    suspend fun getSyncStatus(): Response<JsonObject>
+
     @GET(Constants.USER_PROFILE_ENDPOINT)
     suspend fun getUserProfile(): Response<JsonObject>
 

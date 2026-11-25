@@ -14,6 +14,7 @@ import progressRoutes from './routes/progressRoutes.js';
 import opportunityRoutes from './routes/opportunityRoutes.js';
 import parentRoutes from './routes/parentRoutes.js';
 import tutorRoutes from './routes/tutorRoutes.js';
+import syncRoutes from './routes/syncRoutes.js';
 
 dotenv.config();
 
@@ -25,8 +26,8 @@ connectDB();
 app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
 app.get('/', (req, res) => {
   res.json({
@@ -52,6 +53,7 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/opportunities', opportunityRoutes);
 app.use('/api/parent', parentRoutes);
 app.use('/api/tutor', tutorRoutes);
+app.use('/api/sync', syncRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

@@ -8,6 +8,7 @@ import android.os.Process
 import android.util.Log
 import com.vidyanova.ai.ai.inference.LocalModelEngine
 import com.vidyanova.ai.ai.model.ModelManager
+import com.vidyanova.ai.data.local.sync.SyncWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -66,6 +67,14 @@ class VidyaAiApplication : Application() {
             _setupError.value = "Is phone me RAM kam hai (${totalRamMb}MB). App chalane ke liye kam se kam 2.5 GB RAM chahiye."
             Log.w(TAG, "Skipping model preload due to low RAM: ${totalRamMb}MB")
             return
+        }
+
+        // Schedule WorkManager Sync
+        try {
+            SyncWorker.schedulePeriodicSync(applicationContext)
+            SyncWorker.scheduleOneTimeSync(applicationContext)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error scheduling WorkManager sync: ${e.message}")
         }
 
         applicationScope.launch {

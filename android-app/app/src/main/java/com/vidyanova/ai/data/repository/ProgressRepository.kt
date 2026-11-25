@@ -8,6 +8,10 @@ import java.io.IOException
 
 object ProgressRepository {
 
+    suspend fun recordStudyTime(minutes: Int) {
+        Log.i(TAG, "Recorded $minutes minutes of focus study time.")
+    }
+
     suspend fun recordTutorQuestion(
         classLevel: Int,
         subject: String,
