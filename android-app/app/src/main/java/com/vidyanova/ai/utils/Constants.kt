@@ -2,7 +2,7 @@ package com.vidyanova.ai.utils
 
 object Constants {
 
-    const val BASE_URL = "http://10.0.2.2:5000/"
+    const val BASE_URL = "https://vidyaai-tqol.onrender.com/"
 
     const val HEALTH_ENDPOINT = "api/health"
 
