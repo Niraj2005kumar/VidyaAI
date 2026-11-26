@@ -24,9 +24,9 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Psychology
@@ -41,6 +41,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -96,6 +97,8 @@ fun SettingsScreen(
 
     var showConsentDialog by remember { mutableStateOf(false) }
     var showClassDialog by remember { mutableStateOf(false) }
+    var showEditProfileDialog by remember { mutableStateOf(false) }
+    var editNameInput by remember { mutableStateOf(studentName) }
 
     var selectedTheme by remember { mutableStateOf("System Default") }
     var notificationsEnabled by remember { mutableStateOf(true) }
@@ -108,6 +111,46 @@ fun SettingsScreen(
         if (timeMs == 0L) return "Never synced"
         val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
         return sdf.format(Date(timeMs))
+    }
+
+    // Edit Profile Name Dialog
+    if (showEditProfileDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditProfileDialog = false },
+            title = { Text("Edit Student Name", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = editNameInput,
+                        onValueChange = { editNameInput = it },
+                        label = { Text("Student Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            if (editNameInput.isNotBlank()) {
+                                userPrefs.saveStudentName(editNameInput.trim())
+                            }
+                            showEditProfileDialog = false
+                            Toast.makeText(context, "Student name updated!", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditProfileDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // Class Selector Dialog
@@ -175,19 +218,39 @@ fun SettingsScreen(
                 // Section: Profile
                 item {
                     SettingsCard(title = "Profile", icon = Icons.Default.Person) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { showClassDialog = true }
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(text = studentName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                                Text(text = "Class $classLevel • Secondary Level (Tap to change)", style = MaterialTheme.typography.bodySmall, color = Primary)
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        editNameInput = studentName
+                                        showEditProfileDialog = true
+                                    }
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(text = studentName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
+                                    Text(text = "Tap to edit student name", style = MaterialTheme.typography.bodySmall, color = Primary)
+                                }
+                                Icon(Icons.Default.Edit, contentDescription = "Edit Name", tint = Primary)
                             }
-                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Primary)
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showClassDialog = true }
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(text = "Class $classLevel • Secondary Level", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text(text = "Tap to change class level", style = MaterialTheme.typography.bodySmall, color = Primary)
+                                }
+                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Primary)
+                            }
                         }
                     }
                 }
@@ -383,6 +446,15 @@ fun SettingsScreen(
                                 colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Primary)
                             )
                         }
+                    }
+                }
+
+                // Section: Parent Controls
+                item {
+                    SettingsCard(title = "Parent Controls", icon = Icons.Default.Security) {
+                        SettingsRow(label = "Security PIN", value = "Configured (••••)")
+                        Spacer(modifier = Modifier.height(10.dp))
+                        SettingsRow(label = "Daily Screen Limit", value = "2 Hours")
                     }
                 }
 

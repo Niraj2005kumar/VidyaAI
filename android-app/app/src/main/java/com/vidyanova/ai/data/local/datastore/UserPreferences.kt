@@ -74,7 +74,16 @@ class UserPreferences(private val context: Context) {
     }
 
     val studentNameFlow: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[STUDENT_NAME_KEY] ?: "Guest Student"
+        val savedName = prefs[STUDENT_NAME_KEY]
+        if (!savedName.isNullOrBlank() && savedName != "Student") savedName else "Guest Student"
+    }
+
+    suspend fun saveStudentName(name: String) {
+        if (name.isNotBlank()) {
+            context.dataStore.edit { prefs ->
+                prefs[STUDENT_NAME_KEY] = name.trim()
+            }
+        }
     }
 
     val classLevelFlow: Flow<Int> = context.dataStore.data.map { prefs ->
@@ -109,7 +118,9 @@ class UserPreferences(private val context: Context) {
 
     suspend fun saveStudentProfile(name: String, email: String, classLevel: Int) {
         context.dataStore.edit { prefs ->
-            prefs[STUDENT_NAME_KEY] = name
+            if (name.isNotBlank() && name != "Student") {
+                prefs[STUDENT_NAME_KEY] = name.trim()
+            }
             prefs[CLASS_LEVEL_KEY] = classLevel
             if (prefs[AUTH_TOKEN_KEY].isNullOrBlank()) {
                 prefs[AUTH_TOKEN_KEY] = "offline_local_token_${UUID.randomUUID()}"

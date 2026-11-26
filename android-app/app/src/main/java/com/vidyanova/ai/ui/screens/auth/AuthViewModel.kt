@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vidyanova.ai.data.local.datastore.UserPreferences
+import com.vidyanova.ai.data.network.AuthTokenStore
 import com.vidyanova.ai.data.network.LoginRequest
 import com.vidyanova.ai.data.network.RegisterRequest
 import com.vidyanova.ai.data.repository.AuthRepository
@@ -37,17 +38,35 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
         viewModelScope.launch {
+            val derivedName = email.substringBefore("@").replace(".", " ").capitalize()
             try {
-                userPrefs.saveStudentProfile("Student", email.trim(), 10)
                 val response = AuthRepository.login(
                     LoginRequest(email = email.trim(), password = pass.trim())
                 )
                 if (response.isSuccessful && response.body()?.success == true) {
-                    Log.i(TAG, "Server login successful for user $email")
+                    val token = response.body()?.token
+                    if (!token.isNullOrBlank()) {
+                        AuthTokenStore.saveToken(token)
+                        userPrefs.saveAuthToken(token)
+                    }
+                    userPrefs.saveStudentProfile(derivedName, email.trim(), 10)
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isSuccess = true,
+                        userEmail = email.trim(),
+                        errorMessage = null
+                    )
+                    Log.i(TAG, "Server login & token authorization successful for user $email")
+                } else {
+                    val msg = response.body()?.message ?: "Login failed. Invalid email or password."
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = msg
+                    )
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Server login skipped in offline mode: ${e.message}")
-            } finally {
+                Log.w(TAG, "Server offline, proceeding in local offline mode: ${e.message}")
+                userPrefs.saveStudentProfile(derivedName, email.trim(), 10)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     isSuccess = true,
@@ -70,7 +89,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             try {
-                userPrefs.saveStudentProfile(name.trim(), email.trim(), classLevel)
                 val response = AuthRepository.register(
                     RegisterRequest(
                         name = name.trim(),
@@ -80,11 +98,29 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
                 if (response.isSuccessful && response.body()?.success == true) {
-                    Log.i(TAG, "Server registration successful for user $email")
+                    val token = response.body()?.token
+                    if (!token.isNullOrBlank()) {
+                        AuthTokenStore.saveToken(token)
+                        userPrefs.saveAuthToken(token)
+                    }
+                    userPrefs.saveStudentProfile(name.trim(), email.trim(), classLevel)
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isSuccess = true,
+                        userEmail = email.trim(),
+                        errorMessage = null
+                    )
+                    Log.i(TAG, "Server registration & token authorization successful for $email")
+                } else {
+                    val msg = response.body()?.message ?: "Registration failed."
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = msg
+                    )
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Server registration skipped in offline mode: ${e.message}")
-            } finally {
+                Log.w(TAG, "Server offline, proceeding in local offline mode: ${e.message}")
+                userPrefs.saveStudentProfile(name.trim(), email.trim(), classLevel)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     isSuccess = true,
