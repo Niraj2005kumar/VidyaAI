@@ -1,5 +1,7 @@
 package com.vidyanova.ai.ui.components
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,20 +16,52 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vidyanova.ai.R
 import com.vidyanova.ai.ui.theme.Primary
 import com.vidyanova.ai.ui.theme.Success
+
+@Composable
+fun AppLogoIcon(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val imageBitmap = remember(context) {
+        try {
+            val bitmap = BitmapFactory.decodeResource(context.resources, R.drawable.ic_app_logo)
+            bitmap?.asImageBitmap()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    if (imageBitmap != null) {
+        Image(
+            bitmap = imageBitmap,
+            contentDescription = "VidyaAI Logo",
+            modifier = modifier
+        )
+    } else {
+        Icon(
+            imageVector = Icons.Default.AutoAwesome,
+            contentDescription = "VidyaAI Logo",
+            tint = Primary,
+            modifier = modifier
+        )
+    }
+}
 
 @Composable
 fun AppTopBar(
@@ -61,19 +95,30 @@ fun AppTopBar(
             Spacer(modifier = Modifier.width(12.dp))
         }
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.Bold
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            AppLogoIcon(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
             )
-            if (subtitle != null) {
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
                 Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold
                 )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 

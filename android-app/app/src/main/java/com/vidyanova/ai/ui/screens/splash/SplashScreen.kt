@@ -22,15 +22,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vidyanova.ai.ui.components.AppLogoIcon
 import com.vidyanova.ai.ui.theme.Primary
 import com.vidyanova.ai.ui.theme.PrimaryDark
-import com.vidyanova.ai.ui.theme.Secondary
 import kotlinx.coroutines.delay
 
 @Composable
@@ -66,25 +64,11 @@ fun SplashScreen(
                 .scale(scale.value)
                 .alpha(alpha.value)
         ) {
-            Box(
+            AppLogoIcon(
                 modifier = Modifier
                     .size(108.dp)
                     .shadow(16.dp, CircleShape, spotColor = Primary)
-                    .background(
-                        brush = Brush.linearGradient(
-                            listOf(Primary, Secondary)
-                        ),
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "V",
-                    fontSize = 58.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White
-                )
-            }
+            )
 
             Spacer(modifier = Modifier.height(28.dp))
 

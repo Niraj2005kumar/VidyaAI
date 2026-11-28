@@ -23,7 +23,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Class
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
@@ -72,6 +71,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.vidyanova.ai.ui.components.AppLogoIcon
 import com.vidyanova.ai.ui.theme.HeaderGradientBottom
 import com.vidyanova.ai.ui.theme.HeaderGradientTop
 import com.vidyanova.ai.ui.theme.Primary
@@ -156,25 +156,18 @@ fun LoginScreen(
         ) {
             Spacer(modifier = Modifier.height(20.dp))
 
-            // App Brand Header
+            // App Brand Header with Golden V Emblem Logo
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Box(
+                AppLogoIcon(
                     modifier = Modifier
-                        .size(44.dp)
-                        .background(Color.White, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = "VidyaAI",
-                        tint = Primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
+                        .size(50.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .shadow(4.dp, RoundedCornerShape(14.dp))
+                )
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = "VidyaAI",
                     fontSize = 28.sp,

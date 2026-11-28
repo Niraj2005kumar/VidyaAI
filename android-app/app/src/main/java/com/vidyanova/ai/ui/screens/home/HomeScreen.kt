@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.OndemandVideo
 import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Security
@@ -71,6 +70,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vidyanova.ai.ui.components.AppLogoIcon
 import com.vidyanova.ai.ui.components.ProgressCard
 import com.vidyanova.ai.ui.components.SubjectCard
 import com.vidyanova.ai.ui.models.ModelExamItem
@@ -126,12 +126,16 @@ fun HomeScreen(
                         .fillMaxSize()
                         .padding(24.dp)
                 ) {
-                    Text(
-                        text = "VidyaAI Menu",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = PrimaryText
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AppLogoIcon(modifier = Modifier.size(28.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "VidyaAI Menu",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryText
+                        )
+                    }
                     Spacer(modifier = Modifier.height(24.dp))
                     NavigationDrawerItem(
                         label = { Text("Home") },
@@ -475,7 +479,7 @@ fun HeaderBanner(
                 .statusBarsPadding()
                 .padding(horizontal = 16.dp)
         ) {
-            // Header Top Bar
+            // Header Top Bar with Golden V Emblem Logo
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -492,12 +496,20 @@ fun HeaderBanner(
                     )
                 }
 
-                Text(
-                    text = "VidyaAI",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PrimaryText
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AppLogoIcon(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "VidyaAI",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PrimaryText
+                    )
+                }
 
                 Spacer(modifier = Modifier.width(48.dp))
             }

@@ -13,7 +13,9 @@
     <application
         android:name=".VidyaAiApplication"
         android:allowBackup="true"
-        android:label="VidyaNova"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="VidyaAI"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
         android:theme="@style/AppTheme">
